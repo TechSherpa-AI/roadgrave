@@ -7,6 +7,12 @@
  NOTES
 -----------------------------------------------------------------------------
  CHANGELOG
+   0.3.2  Rig schematic: live top-down SVG blueprint of the vehicle in the
+          Garage and Workshop — chassis silhouette per type, armor pips on
+          every facing, weapons drawn at their mounts (turret ring shown),
+          plant/gear badges, wheels; damage renders red, chipped armor
+          empties pips. Optional chassis portrait slots
+          (img/chassis-<id>.jpg) in Yard and Garage.
    0.3.1  Slice 2 narrative pass: pre-fight intro scenes per bout, foes
           speak during combat (taunts when they hit, cracks when hurt),
           crowd ambience lines, tier-specific victory/defeat epilogues,
@@ -142,7 +148,7 @@
    ROADGRAVE core
    ======================================================================== */
 const VERSION = 3;
-const BUILD   = "0.3.1";
+const BUILD   = "0.3.2";
 const SAVE_KEY = "roadgrave.save";
 
 /* ---- static content tables — balancing is table edits, not code -------- */
@@ -407,6 +413,94 @@ function repairCost(v){
   const raw = v.dmg.hull*6 + v.dmg.tires*8 + v.dmg.plant*20 + v.weapons.filter(w=>w.dmgd).length*12;
   const disc = Math.min(0.25, G.driver.skills.mechanics*0.05);
   return Math.ceil(raw*(1-disc));
+}
+
+/* ---- rig schematic: live top-down SVG blueprint of the build ----------- */
+const WABBR = { scatter:"SCT", mg:"MG", cannon:"CAN", rockets:"RKT" };
+const PABBR = { junker:"J6", v8:"V8", turbine:"TRB" };
+function vSchematic(v, maxw){
+  const dims = { skiff:{w:78,len:170,wheels:2}, courser:{w:100,len:210,wheels:2},
+                 drayhulk:{w:120,len:252,wheels:3} }[v.chassis];
+  const cx=100, cy=160;
+  const x0=cx-dims.w/2, x1=cx+dims.w/2, y0=cy-dims.len/2, y1=cy+dims.len/2;
+  const dmg = v.dmg||{hull:0,tires:0,plant:0};
+  const P=[];
+
+  // wheels (axle rows); shredded tires render red
+  const rows = dims.wheels===3 ? [y0+18, cy-12, y1-42] : [y0+18, y1-42];
+  let wi=0;
+  rows.forEach(wy=>[x0-7,x1-5].forEach(wx=>{
+    const bad = wi++ < dmg.tires;
+    P.push(`<rect x="${wx}" y="${wy}" width="12" height="26" rx="4" fill="${bad?"#4a1512":"#0e1114"}" stroke="${bad?"#e06055":"#3a4048"}"/>`);
+  }));
+
+  // hull + windshield
+  P.push(`<path d="M ${x0+12} ${y0} L ${x1-12} ${y0} Q ${x1} ${y0} ${x1} ${y0+18} L ${x1} ${y1-10} Q ${x1} ${y1} ${x1-10} ${y1} L ${x0+10} ${y1} Q ${x0} ${y1} ${x0} ${y1-10} L ${x0} ${y0+18} Q ${x0} ${y0} ${x0+12} ${y0} Z"
+    fill="#1b2027" stroke="${dmg.hull?"#e06055":"#4a5561"}" stroke-width="2"/>`);
+  P.push(`<rect x="${x0+12}" y="${y0+Math.round(dims.len*0.30)}" width="${dims.w-24}" height="14" rx="4" fill="#252d36"/>`);
+
+  // armor pips per facing (8 slots each)
+  const pip=(x,y,w,h,on)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="${on?"#e8b04a":"none"}" stroke="#3a4048" stroke-width="1"/>`;
+  for(let i=0;i<8;i++){
+    P.push(pip(cx-47+i*12, y0-16, 10, 6, i<v.armor.F));
+    P.push(pip(cx-47+i*12, y1+10, 10, 6, i<v.armor.B));
+    P.push(pip(x0-16, cy-47+i*12, 6, 10, i<v.armor.L));
+    P.push(pip(x1+10, cy-47+i*12, 6, 10, i<v.armor.R));
+  }
+  if(v.armor.T) P.push(`<text x="${x1-6}" y="${y0+14}" font-size="9" fill="#e8b04a" text-anchor="end">T:${v.armor.T}</text>`);
+
+  // ram plate bumper
+  if(v.gear.some(g=>g.id==="ram"))
+    P.push(`<rect x="${x0-2}" y="${y0-8}" width="${dims.w+4}" height="6" rx="2" fill="#e8b04a" opacity="0.85"/>`);
+
+  // power plant block
+  const plBad = dmg.plant>0;
+  P.push(`<rect x="${cx-19}" y="${y0+10}" width="38" height="18" rx="3" fill="#20262d" stroke="${plBad?"#e06055":v.plant?"#4a5561":"#3a4048"}" ${v.plant?"":'stroke-dasharray="3,3"'}/>`);
+  P.push(`<text x="${cx}" y="${y0+23}" font-size="10" fill="${plBad?"#e06055":v.plant?"#e8e6df":"#5a636d"}" text-anchor="middle">${v.plant?PABBR[v.plant]:"——"}</text>`);
+  if(v.gear.some(g=>g.id==="coolant"))
+    P.push(`<text x="${cx+30}" y="${y0+23}" font-size="8" fill="#6fa8dc">CL</text>`);
+
+  // cargo rack
+  if(v.gear.some(g=>g.id==="rack"))
+    P.push(`<rect x="${x0+14}" y="${y1-64}" width="${dims.w-28}" height="34" rx="4" fill="none" stroke="#5a636d" stroke-dasharray="4,3"/>
+            <text x="${cx}" y="${y1-44}" font-size="8" fill="#5a636d" text-anchor="middle">CARGO</text>`);
+
+  // turret ring
+  const hasRing = v.gear.some(g=>g.id==="ring");
+  if(hasRing) P.push(`<circle cx="${cx}" cy="${cy+8}" r="18" fill="none" stroke="#5a636d" stroke-dasharray="3,3"/>`);
+
+  // weapons at their mounts
+  const wpn=(x,y,ang,w)=>{
+    const bad=w.dmgd, dry=w.ammo<=0;
+    const col = bad?"#e06055": dry?"#5a636d":"#c9c4b8";
+    return `<g transform="translate(${x},${y})">
+      <g transform="rotate(${ang})">
+        <line x1="0" y1="-8" x2="0" y2="-22" stroke="${col}" stroke-width="3"/>
+        <rect x="-14" y="-8" width="28" height="15" rx="3" fill="#20262d" stroke="${col}"/>
+      </g>
+      <text x="0" y="3" font-size="8.5" fill="${col}" text-anchor="middle">${WABBR[w.id]}</text>
+      ${bad?`<line x1="-14" y1="-8" x2="14" y2="7" stroke="#e06055" stroke-width="2"/>`:""}
+    </g>`;
+  };
+  const off=[[0],[-22,22],[-26,0,26],[-33,-11,11,33]];
+  const grp={F:[],L:[],R:[],B:[],T:[]};
+  v.weapons.forEach(w=>grp[w.facing].push(w));
+  grp.F.forEach((w,k)=>P.push(wpn(cx+off[grp.F.length-1][k], y0+52, 0, w)));
+  grp.B.forEach((w,k)=>P.push(wpn(cx+off[grp.B.length-1][k], y1-16, 180, w)));
+  grp.L.forEach((w,k)=>P.push(wpn(x0+12, cy+34*k, 270, w)));
+  grp.R.forEach((w,k)=>P.push(wpn(x1-12, cy+34*k, 90, w)));
+  grp.T.forEach((w)=>P.push(wpn(cx, cy+8, 30, w)));
+
+  // dropped-gear chips at the tail
+  const tail = v.gear.filter(g=>["smoke","oil","mines"].includes(g.id));
+  tail.forEach((g,k)=>{
+    const x = cx + (k-(tail.length-1)/2)*22;
+    const dry = !g.charges;
+    P.push(`<circle cx="${x}" cy="${y1+26}" r="8" fill="#20262d" stroke="${dry?"#3a4048":"#9aa3ad"}"/>
+      <text x="${x}" y="${y1+29}" font-size="8" fill="${dry?"#5a636d":"#9aa3ad"}" text-anchor="middle">${g.id==="smoke"?"S":g.id==="oil"?"O":"M"}</text>`);
+  });
+
+  return `<svg viewBox="0 0 200 320" style="width:100%;max-width:${maxw||220}px;display:block;margin:0 auto">${P.join("")}</svg>`;
 }
 function vInvested(v){
   const ch = byId(DATA.chassis, v.chassis);
@@ -974,10 +1068,11 @@ const SCREENS = {
     const v = vehicle();
     if(!v){
       const rows = DATA.chassis.map(ch=>`
+        ${hero("chassis-"+ch.id)}
         <button data-act="buyChassis" data-id="${ch.id}" ${G.scrap<ch.cost?"disabled":""}>
           ${ch.name} — ${ch.cost} scrap
           <span class="sub">${ch.blurb}</span>
-          <span class="sub">Frame ${ch.wt} wt · carries ${ch.maxGross} · ${ch.space} space · ${ch.mounts} mounts · handling ${ch.handling>=0?"+":""}${ch.handling}</span>
+          <span class="sub">Frame ${ch.wt} wt · carries ${ch.maxGross} · ${ch.space} space · ${ch.mounts} mounts · handling ${ch.handling>=0?"+":""}${ch.handling} · hull ${ch.hull}</span>
         </button>`).join("");
       app.appendChild(el(`<main>
         ${hero("garage")}
@@ -998,9 +1093,10 @@ const SCREENS = {
       return `<div class="kv"><span>${d.name}</span><span>${g.charges!=null?g.charges+" charges":"—"}</span></div>`;
     }).join("") || `<p class="dim">No gear installed.</p>`;
     app.appendChild(el(`<main>
-      ${hero("garage")}
+      ${hero("chassis-"+v.chassis)}
       <div class="row"><h1 style="font-size:22px; letter-spacing:.06em; text-align:left;" class="grow">${esc(v.name)}</h1>
         <button class="small" style="width:auto" data-act="renameVehicle">Rename</button></div>
+      <div class="panel">${vSchematic(v, 230)}</div>
       <div class="panel">
         <div class="kv"><span>Chassis</span><b>${s.ch.name}</b></div>
         <div class="kv"><span>Power plant</span><b>${s.pl?s.pl.name:'<span class="warn">none — she won’t start</span>'}</b></div>
@@ -1102,6 +1198,7 @@ const SCREENS = {
 
     app.appendChild(el(`<main>
       ${statbar}
+      <div class="panel">${vSchematic(v, 190)}</div>
       <p class="flavor">Grease, sparks, and the radio playing static hymns. Sell-back is ${SELLBACK*100}% — experiment freely.</p>
       <h2>Power plant</h2>
       ${plants}
