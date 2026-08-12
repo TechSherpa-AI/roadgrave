@@ -7,6 +7,11 @@
  NOTES
 -----------------------------------------------------------------------------
  CHANGELOG
+   0.3.1  Slice 2 narrative pass: pre-fight intro scenes per bout, foes
+          speak during combat (taunts when they hit, cracks when hurt),
+          crowd ambience lines, tier-specific victory/defeat epilogues,
+          the militia nod arc (nod -> two nods -> salute), victory art
+          slot (img/arena-win.jpg), richer arena lobby prose.
    0.3.0  Slice 2: The Crucible — turn-based tactical combat on a 12-band
           3-lane oval. Initiative rolls, maneuvers (accelerate, brake,
           swerve, boost, ram), weapon arcs vs armor facings, live to-hit
@@ -137,7 +142,7 @@
    ROADGRAVE core
    ======================================================================== */
 const VERSION = 3;
-const BUILD   = "0.3.0";
+const BUILD   = "0.3.1";
 const SAVE_KEY = "roadgrave.save";
 
 /* ---- static content tables — balancing is table edits, not code -------- */
@@ -206,24 +211,80 @@ const DATA = {
   ],
   weaponFacings:[["F","Front"],["L","Left"],["R","Right"],["B","Rear"]],
   rngMax:{ Close:2, Medium:4, Long:6 },
+  crowd: [
+    "The bleachers move like water — ten thousand people leaning with every turn.",
+    "Somewhere in the stands a drum crew keeps time with your engine.",
+    "A vendor's cry cuts the din: char-corn, hot slag, fresh odds on the underdog.",
+    "Grinder-spit rains from the rails — the crowd throws sparks when the bout runs hot.",
+  ],
   arena: [
     { id:"q", name:"Qualifier — Blood & Gravel", purse:120, repeat:60, xp:1,
       pitch:"Every season the Crucible feeds on fresh drivers. Prove you're not food.",
       foe:{ name:"Pipsqueak Odo", skills:{driving:1,gunnery:1},
         v:{ chassis:"skiff", plant:"junker", armor:{F:2,L:1,R:1,B:1,T:0},
-            weapons:[{id:"scatter",facing:"F",ammo:10}], gear:[], dmg:{hull:0,tires:0,plant:0} } } },
+            weapons:[{id:"scatter",facing:"F",ammo:10}], gear:[], dmg:{hull:0,tires:0,plant:0} } },
+      intro:[
+        "The holding pen smells of coolant and fear. Beyond the gate: a bowl of packed slag and chain-link, and ten thousand people who paid to watch steel die.",
+        "Pipsqueak Odo revs a patched Salt Skiff two stalls down. He doesn't look at you — rookies never do. \"Nothing personal,\" he mutters to his wheel. \"I just gotta eat.\"",
+        "The pit master drops his arm.",
+      ],
+      barks:{
+        taunt:[ "Odo whoops: \"That one's for my landlord!\"",
+                "\"Stay still!\" Odo shouts over the engines. \"It's quicker if you stay still!\"" ],
+        pain:[  "Odo's voice cracks over the din: \"Okay. Okay okay okay—\"",
+                "Something tears loose off the Skiff. Odo stops singing." ],
+        beaten:"Odo climbs out with his hands up, grinning through a split lip. \"Worth it,\" he calls. \"Almost.\"",
+        victor:"Odo circles your wreck once, almost apologetic. \"Told you,\" he says. \"Gotta eat.\"",
+      },
+      winText:"The gate crew hauls the Skiff off in chains while the crowd stamps the bleachers into thunder. At the gate, a militia sergeant in slag-grey leathers looks you over — takes in the fresh scars, the smoking barrels — and gives you a single, short nod. In Kettle Rock, that nod is worth more than the purse.",
+      loseText:"You come to with a tow chain rattling past your window and the taste of copper in your mouth. The crowd is already chanting someone else's name. The Gravel Sea doesn't grieve, and neither does the Crucible.",
+    },
     { id:"p", name:"Purse Bout — The Grinder", purse:250, repeat:150, xp:2, req:"q",
       pitch:"Kess the Vulture strips her kills before they stop rolling.",
       foe:{ name:"Kess the Vulture", skills:{driving:2,gunnery:2},
         v:{ chassis:"courser", plant:"v8", armor:{F:3,L:2,R:2,B:2,T:0},
-            weapons:[{id:"mg",facing:"F",ammo:20},{id:"scatter",facing:"B",ammo:10}], gear:[], dmg:{hull:0,tires:0,plant:0} } } },
+            weapons:[{id:"mg",facing:"F",ammo:20},{id:"scatter",facing:"B",ammo:10}], gear:[], dmg:{hull:0,tires:0,plant:0} } },
+      intro:[
+        "Night bout. Floodlights turn the pit floor to hammered tin, and the shadows under the bleachers are full of buyers who deal in what's left of losers.",
+        "Kess the Vulture walks her Courser's perimeter, tapping each panel — a ritual, or an inventory. She looks at your rig the way a butcher looks at weight. \"I'll keep the plant,\" she says. \"The rest is scrap.\"",
+        "Somewhere above, the odds change hands one last time. The gate drops.",
+      ],
+      barks:{
+        taunt:[ "\"Hold still,\" Kess says, flat over the loudspeaker crackle. \"You're damaging my property.\"",
+                "Kess: \"Every dent you take comes off my resale.\"" ],
+        pain:[  "Kess goes quiet. Somehow that's worse than shouting.",
+                "\"That,\" Kess says tonelessly, \"was expensive.\"" ],
+        beaten:"Kess steps out before her wreck stops smoking and studies it, already itemizing the loss. She spares you exactly one look: \"Decent work. I'd have kept your plant.\"",
+        victor:"Kess is already walking your wreck with a grease pencil, marking what she'll keep.",
+      },
+      winText:"The Grinder's crowd doesn't cheer so much as roar — a furnace sound that gets into your chest and stays. Scrap rains onto the pit floor, flung by winners of bets. At the gate the same militia sergeant is waiting. Two nods this time. People notice things like that here.",
+      loseText:"The tow crew works fast, because Kess pays them to. You keep your rig — barely; the militia's one mercy rule — but she walks off with your pride itemized on a slate.",
+    },
     { id:"t", name:"Title Bout — Halfaxe", purse:500, repeat:300, xp:3, req:"p",
       pitch:"Bruna Halfaxe has held the title for three seasons. The crowd chants her name. It sounds like hammers.",
       foe:{ name:"Bruna Halfaxe", skills:{driving:3,gunnery:3},
         v:{ chassis:"drayhulk", plant:"v8", armor:{F:4,L:3,R:3,B:3,T:1},
             weapons:[{id:"cannon",facing:"F",ammo:8},{id:"mg",facing:"T",ammo:20}],
-            gear:[{id:"ram",charges:null},{id:"ring",charges:null}], dmg:{hull:0,tires:0,plant:0} } } },
+            gear:[{id:"ram",charges:null},{id:"ring",charges:null}], dmg:{hull:0,tires:0,plant:0} } },
+      intro:[
+        "They pack the bleachers to standing for a title bout. Vendors sell char-corn and engine-grease candy; children wear hammered-tin axes on strings.",
+        "Bruna Halfaxe doesn't posture. She sits on the Drayhulk's push-bar, wrapping her wrists, watching you the way weather watches a roof. \"Three seasons,\" she says, not unkindly. \"Know what I've learned? Everybody's brave until the third hit.\"",
+        "She stands. The crowd starts chanting. It sounds like hammers — it IS hammers, ten thousand fists on tin.",
+      ],
+      barks:{
+        taunt:[ "Bruna, calm over the loudspeaker: \"First hit.\"",
+                "\"Second hit,\" Bruna counts, and the crowd counts with her.",
+                "The Drayhulk fills your mirrors like a building falling." ],
+        pain:[  "A sound moves through the crowd like weather turning — Bruna Halfaxe just got hurt.",
+                "Bruna laughs, loud and real. \"THERE you are! Finally — a bout!\"" ],
+        beaten:"The Drayhulk shudders, sags, and dies. In the sudden quiet you hear one pair of hands clapping, slow and steady: Bruna's, from inside the wreck. \"Good bout,\" she calls. \"Champion.\"",
+        victor:"Bruna idles beside your wreck a long moment. \"Third hit,\" she says, and the crowd takes up her name in hammer-time.",
+      },
+      winText:"They don't crown champions in Kettle Rock. They brand your name onto the Crucible's gate with a welding torch, right beneath three seasons of Bruna's. The militia sergeant doesn't nod this time — he salutes. Next season, the kids' tin axes will carry YOUR sigil.",
+      loseText:"You wake to Bruna's own crew pulling you clear — champion's courtesy. She crouches by your window a moment before the tow. \"Everybody's brave until the third hit,\" she says. \"You lasted to the third. Come back.\"",
+    },
   ],
+  repeatWinText:"The crowd knows your name now. A returning winner draws a lighter purse but the same roar — and the sergeant at the gate still gives you the nod.",
 };
 const byId = (list,id)=>list.find(x=>x.id===id);
 
@@ -617,10 +678,10 @@ function startBout(tierId){
     called:null, enemyFirst:false,
     p:{ pos:0, lane:1, speed:1, heat:ps.heatCap, drvPen:0 },
     e:{ pos:5, lane:1, speed:1, heat:es.heatCap, drvPen:0 },
-    foe:{ name:tier.foe.name, skills:tier.foe.skills },
+    foe:{ name:tier.foe.name, skills:tier.foe.skills, barks:tier.barks },
     foeV, log:[],
   };
-  cLog(`The gate drops. ${tier.foe.name} guns it. The crowd is a wall of rust and noise.`);
+  (tier.intro||[]).forEach(cLog);
   startRound(true);
   setScreen("fight");
 }
@@ -633,6 +694,7 @@ function startRound(first){
   const pInit = skillOf(fighterFor("p"),"driving") + ps.handling + d6();
   const eInit = skillOf(fighterFor("e"),"driving") + es.handling + d6();
   c.enemyFirst = eInit > pInit;
+  if(c.round>1 && c.round%3===0 && !c.done) cLog(pick(DATA.crowd));
   if(c.enemyFirst && !c.done){ cLog(`Round ${c.round}: ${c.foe.name} has the jump.`); enemyTurn(); }
   else if(!c.done) cLog(`Round ${c.round}: you have the initiative.`);
 }
@@ -656,6 +718,7 @@ function resolveRam(attSide){
   if(r2.driver) att.st.drvPen++;
   cLog(`${att.label} RAMS ${def.label}: ${r1.msg}`);
   cLog(`Recoil: ${r2.msg}`);
+  if(rand()<0.5) cLog("The crowd comes UP off the bleachers — nothing sells tickets like steel on steel.");
   att.st.speed = Math.max(0, att.st.speed-1);
   def.st.speed = Math.max(0, def.st.speed-1);
 }
@@ -674,6 +737,9 @@ function fireWeapon(attSide, wi, called){
     const res = applyDamage(def.v, brg.hitFacing, rollDmg(d.dmg), called);
     if(res.driver) def.st.drvPen++;
     cLog(`${att.label}'s ${d.name}${called?" (called: "+called+")":""} hits — ${res.msg}`);
+    const barks = c.foe.barks||{};
+    if(attSide==="e" && barks.taunt && rand()<0.35) cLog(pick(barks.taunt));
+    if(attSide==="p" && res.msg.includes("through") && barks.pain && rand()<0.4) cLog(pick(barks.pain));
   } else {
     cLog(`${att.label}'s ${d.name} misses (${roll} vs ${need}%).`);
   }
@@ -694,6 +760,7 @@ function finishBout(){
   c.applied = true;
   const tier = byId(DATA.arena, c.tier);
   G.campaign.flags.arena = G.campaign.flags.arena || {q:0,p:0,t:0};
+  const barks = (c.foe && c.foe.barks) || {};
   if(c.result==="win"){
     const firstWin = G.campaign.flags.arena[c.tier]===0;
     const purse = firstWin ? tier.purse : tier.repeat;
@@ -702,17 +769,17 @@ function finishBout(){
     G.scrap += purse + salvage;
     G.driver.xp += tier.xp;
     G.world.factionRep.militias += 1;
-    c.summary = { purse, salvage };
-    cLog(`${c.foe.name} is out! The crowd roars your name.`);
+    c.summary = { purse, salvage, text: firstWin ? tier.winText : DATA.repeatWinText };
+    if(barks.beaten) cLog(barks.beaten);
     logMsg(`Crucible: beat ${c.foe.name}. Purse ${purse} + ${salvage} salvage scrap.`);
   } else if(G.meta.ironman){
-    c.summary = { ironman:true };
+    c.summary = { ironman:true, text: tier.loseText };
     cLog("Your rig dies around you. Ironman: this is where the story ends.");
   } else {
     const lost = Math.min(G.scrap, Math.max(10, Math.floor(G.scrap*0.2)));
     G.scrap -= lost;
-    c.summary = { lost };
-    cLog(`Tow crews drag you out. The pit fee and vultures cost ${lost} scrap.`);
+    c.summary = { lost, text: tier.loseText };
+    if(barks.victor) cLog(barks.victor);
     logMsg(`Crucible: lost to ${c.foe.name}. Towed out ${lost} scrap lighter.`);
   }
 }
@@ -1127,7 +1194,8 @@ const SCREENS = {
     app.appendChild(el(`<main>
       ${hero("arena")}
       <h2>The Crucible</h2>
-      <p class="flavor">A pit of packed slag ringed in weld-scarred bleachers. The militia takes its cut; the crowd takes the rest.</p>
+      <p class="flavor">A pit of packed slag ringed in weld-scarred bleachers, dug where the refinery's biggest tank used to stand. Bout days, half of Kettle Rock climbs the tin. The militia takes its cut at the gate; the crowd takes the rest out of whoever loses.</p>
+      ${wins.t?'<p class="flavor">Your name is burned into the gate in torch-script, right under three seasons of Bruna\'s. Kids point when you walk past.</p>':""}
       <div class="panel"><p>${readyLine}</p></div>
       ${rows}
       ${backBtn()}
@@ -1157,12 +1225,14 @@ const SCREENS = {
     let controls = "";
     if(c.done){
       const s = c.summary||{};
-      controls = `<div class="panel">
+      controls = `${c.result==="win"?hero("arena-win"):""}<div class="panel">
+        <p class="${c.result==="win"?"good":"warn"}"><b>${c.result==="win"?"VICTORY.":"WRECKED."}</b></p>
+        ${s.text?`<p class="flavor">${esc(s.text)}</p>`:""}
         ${c.result==="win"
-          ? `<p class="good"><b>VICTORY.</b> Purse ${s.purse} scrap, salvage ${s.salvage} more. The militia nods. That means a lot here.</p>`
+          ? `<p>Purse: <b>${s.purse}</b> scrap · picked from the wreck: <b>${s.salvage}</b> more.</p>`
           : s.ironman
-            ? `<p class="warn"><b>WRECKED.</b> Ironman: the Gravel Sea keeps what it takes. This save is over.</p>`
-            : `<p class="warn"><b>WRECKED.</b> Tow crews haul you out, ${s.lost} scrap lighter. Your rig — and pride — need work.</p>`}
+            ? `<p class="warn">Ironman: the Gravel Sea keeps what it takes. This save is over.</p>`
+            : `<p>The tow, the pit fee, and the vultures cost <b>${s.lost}</b> scrap. Your rig — and your pride — need the garage.</p>`}
         <button class="primary" data-act="fightDone">${s.ironman?"Accept it":"Leave the pit"}</button>
       </div>`;
     } else if(c.phase==="move"){
