@@ -7,6 +7,15 @@
  NOTES
 -----------------------------------------------------------------------------
  CHANGELOG
+   0.3.0  Slice 2: The Crucible — turn-based tactical combat on a 12-band
+          3-lane oval. Initiative rolls, maneuvers (accelerate, brake,
+          swerve, boost, ram), weapon arcs vs armor facings, live to-hit
+          percentages, called shots (tires/plant/weapon), enforced heat
+          budget per round, ablative armor chipping, component damage that
+          degrades handling and speed, three bout tiers with purses and
+          salvage, repairs at the garage (Mechanics discount), defeat as
+          setback (scrap + tow + damage) or ironman wipe, mid-fight
+          save/resume. Backdrop art wired in (img/, compressed).
    0.2.0  Slice 1: driver creation (8 points across 4 skills), garage &
           workshop (chassis, power plants, armor by facing, weapons with
           facings & ammo, utility gear; live weight/power/heat/space
@@ -18,12 +27,13 @@
           toggle (stored), placeholder hub.
 
  KNOWN GAPS
-   - Combat (arena + called shots + heat enforcement) lands in Slice 2;
-     heat is budgeted and displayed but not yet enforced.
    - Job board offers shift work only; real contracts need travel (Slice 3).
    - Crew recruiting at the Slag Bar lands in Slice 4.
-   - XP gain from doing is deferred until combat exists to do things in.
-   - Ironman toggle stored but has no behavioral effect until Slice 2.
+   - Arena wins bank driver XP; spending it lands with progression (Slice 5).
+   - Driver hits in combat are a temporary in-fight penalty; persistent
+     injuries + medics arrive with the crew layer (Slice 4).
+   - Smoke/oil/mines are road gear; they matter in highway fights (Slice 3).
+   - Top armor is tracked but nothing targets it yet (mines/dropped, S3).
    - Backdrop images are optional; game is fully playable without them.
    - Roguelike run structure + meta-progression: deliberately deferred.
 =============================================================================
@@ -103,6 +113,20 @@
     display:grid; grid-template-columns:repeat(4,1fr); gap:4px; font-size:12.5px;}
   .statbar div{text-align:center;}
   .statbar .lbl{color:var(--dim); display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;}
+
+  .track{display:grid; grid-template-columns:repeat(3,1fr); gap:2px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px;}
+  .track .cell{height:24px; border-radius:4px; background:var(--panel2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:700; color:var(--dim);}
+  .track .cell.p{background:#3a3010; color:var(--amber); border:1px solid var(--amber);}
+  .track .cell.e{background:#3a1512; color:var(--red); border:1px solid var(--red);}
+  .track .cell.pe{background:#3a2210; color:var(--ink); border:1px solid var(--red);}
+  .pips{letter-spacing:2px;}
+  .pips .on{color:var(--amber);} .pips .off{color:#3a4048;}
+  .hullpips .on{color:var(--green);} .hullpips .off{color:#3a4048;}
+  .btnrow{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
+  .btnrow button{min-height:46px; text-align:center; font-size:15px; padding:6px;}
 </style>
 </head>
 <body>
@@ -112,8 +136,8 @@
 /* ========================================================================
    ROADGRAVE core
    ======================================================================== */
-const VERSION = 2;
-const BUILD   = "0.2.0";
+const VERSION = 3;
+const BUILD   = "0.3.0";
 const SAVE_KEY = "roadgrave.save";
 
 /* ---- static content tables — balancing is table edits, not code -------- */
@@ -128,11 +152,11 @@ const DATA = {
     { id:"scrounge", name:"Scrounge", desc:"Loot quality, barter, odd luck." },
   ],
   chassis: [
-    { id:"skiff",   name:"Salt Skiff",  cost:100, wt:350, maxGross:900,  space:6,  mounts:2, handling:1,
+    { id:"skiff",   name:"Salt Skiff",  cost:100, wt:350, maxGross:900,  space:6,  mounts:2, handling:1, hull:8,
       blurb:"A stripped dune runner. Quick, fragile, cheap to feed." },
-    { id:"courser", name:"Courser",     cost:220, wt:550, maxGross:1400, space:9,  mounts:3, handling:0,
+    { id:"courser", name:"Courser",     cost:220, wt:550, maxGross:1400, space:9,  mounts:3, handling:0, hull:12,
       blurb:"Pre-Undertow sedan with good bones. The honest choice." },
-    { id:"drayhulk",name:"Drayhulk",    cost:400, wt:900, maxGross:2400, space:14, mounts:4, handling:-1,
+    { id:"drayhulk",name:"Drayhulk",    cost:400, wt:900, maxGross:2400, space:14, mounts:4, handling:-1, hull:18,
       blurb:"A refinery hauler. Slow, vast, and very hard to argue with." },
   ],
   plants: [
@@ -181,6 +205,25 @@ const DATA = {
     "\"They say the Collection's flagship is a refinery on treads. They say you hear it before the horizon shows it.\"",
   ],
   weaponFacings:[["F","Front"],["L","Left"],["R","Right"],["B","Rear"]],
+  rngMax:{ Close:2, Medium:4, Long:6 },
+  arena: [
+    { id:"q", name:"Qualifier — Blood & Gravel", purse:120, repeat:60, xp:1,
+      pitch:"Every season the Crucible feeds on fresh drivers. Prove you're not food.",
+      foe:{ name:"Pipsqueak Odo", skills:{driving:1,gunnery:1},
+        v:{ chassis:"skiff", plant:"junker", armor:{F:2,L:1,R:1,B:1,T:0},
+            weapons:[{id:"scatter",facing:"F",ammo:10}], gear:[], dmg:{hull:0,tires:0,plant:0} } } },
+    { id:"p", name:"Purse Bout — The Grinder", purse:250, repeat:150, xp:2, req:"q",
+      pitch:"Kess the Vulture strips her kills before they stop rolling.",
+      foe:{ name:"Kess the Vulture", skills:{driving:2,gunnery:2},
+        v:{ chassis:"courser", plant:"v8", armor:{F:3,L:2,R:2,B:2,T:0},
+            weapons:[{id:"mg",facing:"F",ammo:20},{id:"scatter",facing:"B",ammo:10}], gear:[], dmg:{hull:0,tires:0,plant:0} } } },
+    { id:"t", name:"Title Bout — Halfaxe", purse:500, repeat:300, xp:3, req:"p",
+      pitch:"Bruna Halfaxe has held the title for three seasons. The crowd chants her name. It sounds like hammers.",
+      foe:{ name:"Bruna Halfaxe", skills:{driving:3,gunnery:3},
+        v:{ chassis:"drayhulk", plant:"v8", armor:{F:4,L:3,R:3,B:3,T:1},
+            weapons:[{id:"cannon",facing:"F",ammo:8},{id:"mg",facing:"T",ammo:20}],
+            gear:[{id:"ram",charges:null},{id:"ring",charges:null}], dmg:{hull:0,tires:0,plant:0} } } },
+  ],
 };
 const byId = (list,id)=>list.find(x=>x.id===id);
 
@@ -220,6 +263,15 @@ const MIGRATIONS = {
     s.driver.name = s.driver.name==="Nameless" ? "" : (s.driver.name||"");
     s.meta.version = 2;
   },
+  2: s => {                       // v2 -> v3: combat fields
+    s.vehicles.forEach(v=>{
+      v.dmg = v.dmg || {hull:0,tires:0,plant:0};
+      v.weapons.forEach(w=>{ if(w.dmgd===undefined) w.dmgd=false; });
+    });
+    s.campaign.flags.arena = s.campaign.flags.arena || {q:0,p:0,t:0};
+    s.combat = s.combat || null;
+    s.meta.version = 3;
+  },
 };
 function migrate(s){
   while(s.meta.version < VERSION){
@@ -258,29 +310,42 @@ function logMsg(t){ G.log.push(t); if(G.log.length>60) G.log.shift(); }
 /* ---- vehicle math ------------------------------------------------------ */
 function newVehicle(chassisId){
   return { name:"", chassis:chassisId, plant:null,
-           armor:{F:0,L:0,R:0,B:0,T:0}, weapons:[], gear:[], cargo:[] };
+           armor:{F:0,L:0,R:0,B:0,T:0}, weapons:[], gear:[], cargo:[],
+           dmg:{hull:0,tires:0,plant:0} };
 }
 function armorPts(v){ return v.armor.F+v.armor.L+v.armor.R+v.armor.B+v.armor.T; }
 function vehicle(){ return G.vehicles[0] || null; }
 function vStats(v){
   const ch = byId(DATA.chassis, v.chassis);
   const pl = v.plant ? byId(DATA.plants, v.plant) : null;
+  const dmg = v.dmg || (v.dmg = {hull:0,tires:0,plant:0});
   const wpnWt  = v.weapons.reduce((a,w)=>a+byId(DATA.weapons,w.id).wt,0);
   const gearWt = v.gear.reduce((a,g)=>a+byId(DATA.gear,g.id).wt,0);
   const weight = ch.wt + (pl?pl.wt:0) + armorPts(v)*DATA.armor.wt + wpnWt + gearWt;
   const spaceUsed = (pl?1:0) + v.weapons.reduce((a,w)=>a+byId(DATA.weapons,w.id).space,0)
                   + v.gear.reduce((a,g)=>a+byId(DATA.gear,g.id).space,0);
   const cargoSpace = v.gear.filter(g=>g.id==="rack").length*4;
-  const power = pl?pl.power:0;
+  let power = pl?pl.power:0;
+  power = Math.round(power * (1 - 0.3*Math.min(dmg.plant,2)));
   const over = weight > ch.maxGross;
   const pw = weight? Math.round(power*1000/weight)/10 : 0;   // power per 100wt
   const accel = !pl ? "—" : pw>=25?"S": pw>=18?"A": pw>=12?"B": pw>=8?"C":"D";
-  const handling = ch.handling + (over?-2:0);
+  const maxSpeed = !pl ? 0 : Math.max(1, ({S:4,A:4,B:3,C:2,D:1})[accel] - (dmg.tires>=2?1:0));
+  const handling = ch.handling + (over?-2:0) - (dmg.tires>=3?2 : dmg.tires>=1?1 : 0);
   const heatCap = (pl?pl.heat:0) + v.gear.filter(g=>g.id==="coolant").length*2;
   const heatDraw = v.weapons.reduce((a,w)=>a+byId(DATA.weapons,w.id).heat,0);
   return { ch, pl, weight, over, spaceUsed, space:ch.space, cargoSpace,
-           power, pw, accel, handling, heatCap, heatDraw,
+           power, pw, accel, maxSpeed, handling, heatCap, heatDraw,
+           hull:ch.hull-dmg.hull, hullMax:ch.hull, dmg,
            mountsUsed:v.weapons.length, mounts:ch.mounts };
+}
+function vDamaged(v){
+  return v.dmg.hull>0 || v.dmg.tires>0 || v.dmg.plant>0 || v.weapons.some(w=>w.dmgd);
+}
+function repairCost(v){
+  const raw = v.dmg.hull*6 + v.dmg.tires*8 + v.dmg.plant*20 + v.weapons.filter(w=>w.dmgd).length*12;
+  const disc = Math.min(0.25, G.driver.skills.mechanics*0.05);
+  return Math.ceil(raw*(1-disc));
 }
 function vInvested(v){
   const ch = byId(DATA.chassis, v.chassis);
@@ -465,6 +530,299 @@ ACTIONS.rumor = () => {
   logMsg("Slag Bar: " + r);
   render();
 };
+ACTIONS.repair = () => {
+  const v = vehicle(); if(!v || !vDamaged(v)) return;
+  if(!pay(repairCost(v))) return;
+  v.dmg = {hull:0,tires:0,plant:0};
+  v.weapons.forEach(w=>w.dmgd=false);
+  logMsg("The wrench crew hammers your rig back into shape.");
+  render();
+};
+
+/* ========================================================================
+   Tactical combat — 12-band oval strip, 3 lanes. All state in G.combat so
+   a force-quit mid-fight resumes exactly where it left off.
+   ======================================================================== */
+const TRACK = 12, LANES = 3;
+function d6(){ return ri(1,6); }
+function rollDmg(spec){                       // "2d6" | "1d6+2"
+  const m = spec.match(/(\d+)d6(?:\+(\d+))?/);
+  let n = 0; for(let i=0;i<+m[1];i++) n += d6();
+  return n + (+(m[2]||0));
+}
+function bearing(a,b){    // attacker state a -> target state b
+  const fwd = (b.pos - a.pos + TRACK) % TRACK;
+  if(fwd===0 && a.lane!==b.lane)
+    return { dist:Math.abs(a.lane-b.lane), arc:b.lane<a.lane?"L":"R", hitFacing:b.lane<a.lane?"R":"L" };
+  if(fwd>=1 && fwd<=6) return { dist:fwd, arc:"F", hitFacing:"B" };
+  if(fwd===0) return { dist:0, arc:"F", hitFacing:"B" };
+  return { dist:TRACK-fwd, arc:"B", hitFacing:"F" };
+}
+function cLog(t){ const c=G.combat; c.log.push(t); if(c.log.length>40) c.log.shift(); }
+
+function fighterFor(side){          // "p" = player, "e" = enemy
+  const c = G.combat;
+  return side==="p"
+    ? { st:c.p, v:vehicle(), skills:G.driver.skills, name:G.driver.name, label:esc(vehicle().name) }
+    : { st:c.e, v:c.foeV, skills:c.foe.skills, name:c.foe.name, label:esc(c.foe.name) };
+}
+function skillOf(f, which){ return Math.max(0,(f.skills[which]||0) - f.st.drvPen); }
+
+function canFire(f, w, brg){
+  const d = byId(DATA.weapons, w.id);
+  if(w.dmgd || w.ammo<=0) return {ok:false, why:w.dmgd?"damaged":"no ammo"};
+  const arcOk = w.facing==="T" || w.facing===brg.arc;
+  if(!arcOk) return {ok:false, why:"out of arc"};
+  if(brg.dist > DATA.rngMax[d.rng]) return {ok:false, why:"out of range"};
+  if(f.st.heat < d.heat) return {ok:false, why:"no heat"};
+  return {ok:true};
+}
+function toHit(f, w, brg, targetSt, called){
+  const d = byId(DATA.weapons, w.id);
+  let n = 55 + skillOf(f,"gunnery")*7
+        + (brg.dist<=1?15 : brg.dist<=2?5 : brg.dist<=4?0 : -15)
+        - targetSt.speed*5
+        - (called?25:0);
+  return Math.max(5, Math.min(95, n));
+}
+/* Ablative armor: the facing absorbs, then chips a point. Penetration
+   damages a component — random on a d6, or exactly what a called shot named. */
+function applyDamage(tv, facing, raw, called){
+  const a = tv.armor[facing]||0;
+  const pen = raw - a;
+  if(a>0) tv.armor[facing] = a-1;
+  if(pen<=0) return {msg:`${facing} armor shrugs it off (${raw} dmg vs ${a} armor, plate chipped)`};
+  let comp = called;
+  if(!comp){ const r=d6(); comp = r<=2?"hull" : r===3?"tires" : r===4?"weapon" : r===5?"plant" : "driver"; }
+  if(comp==="weapon"){
+    const live = tv.weapons.filter(w=>!w.dmgd);
+    if(!live.length) comp = "hull"; else { pick(live).dmgd = true; return {msg:`${pen} through the ${facing} — a weapon is smashed!`}; }
+  }
+  if(comp==="hull"){ tv.dmg.hull += pen; return {msg:`${pen} through the ${facing} into the hull!`}; }
+  if(comp==="tires"){ tv.dmg.tires += 1; return {msg:`${pen} through the ${facing} — a tire is shredded!`}; }
+  if(comp==="plant"){ tv.dmg.plant += 1; return {msg:`${pen} through the ${facing} into the power plant!`}; }
+  return {msg:`${pen} through the ${facing} — the driver is hit!`, driver:true};
+}
+function isOut(v){
+  const s = vStats(v);
+  return s.hull<=0 || v.dmg.plant>=2 || v.dmg.tires>=4;
+}
+
+function startBout(tierId){
+  const tier = byId(DATA.arena, tierId);
+  const foeV = JSON.parse(JSON.stringify(tier.foe.v));
+  const ps = vStats(vehicle()), es = vStats(foeV);
+  G.combat = {
+    tier:tierId, round:1, phase:"move", done:false, result:null, applied:false,
+    called:null, enemyFirst:false,
+    p:{ pos:0, lane:1, speed:1, heat:ps.heatCap, drvPen:0 },
+    e:{ pos:5, lane:1, speed:1, heat:es.heatCap, drvPen:0 },
+    foe:{ name:tier.foe.name, skills:tier.foe.skills },
+    foeV, log:[],
+  };
+  cLog(`The gate drops. ${tier.foe.name} guns it. The crowd is a wall of rust and noise.`);
+  startRound(true);
+  setScreen("fight");
+}
+function startRound(first){
+  const c = G.combat;
+  if(!first){ c.round++; }
+  const ps = vStats(vehicle()), es = vStats(c.foeV);
+  c.p.heat = ps.heatCap; c.e.heat = es.heatCap;
+  c.phase = "move"; c.called = null;
+  const pInit = skillOf(fighterFor("p"),"driving") + ps.handling + d6();
+  const eInit = skillOf(fighterFor("e"),"driving") + es.handling + d6();
+  c.enemyFirst = eInit > pInit;
+  if(c.enemyFirst && !c.done){ cLog(`Round ${c.round}: ${c.foe.name} has the jump.`); enemyTurn(); }
+  else if(!c.done) cLog(`Round ${c.round}: you have the initiative.`);
+}
+function moveFighter(f, spd){
+  f.st.speed = spd;
+  f.st.pos = (f.st.pos + spd) % TRACK;
+}
+function resolveRam(attSide){
+  const att = fighterFor(attSide), def = fighterFor(attSide==="p"?"e":"p");
+  const attPlate = att.v.gear.some(g=>g.id==="ram");
+  const defPlate = def.v.gear.some(g=>g.id==="ram");
+  let dealt = rollDmg("2d6") + att.st.speed;
+  if(attPlate) dealt *= 2;
+  if(defPlate) dealt = Math.ceil(dealt/2);
+  let taken = d6();
+  if(attPlate) taken = Math.ceil(taken/2);
+  const brg = bearing(att.st, def.st);
+  const r1 = applyDamage(def.v, brg.hitFacing==="B"?"B":brg.hitFacing, dealt, null);
+  const r2 = applyDamage(att.v, "F", taken, null);
+  if(r1.driver) def.st.drvPen++;
+  if(r2.driver) att.st.drvPen++;
+  cLog(`${att.label} RAMS ${def.label}: ${r1.msg}`);
+  cLog(`Recoil: ${r2.msg}`);
+  att.st.speed = Math.max(0, att.st.speed-1);
+  def.st.speed = Math.max(0, def.st.speed-1);
+}
+function fireWeapon(attSide, wi, called){
+  const c = G.combat;
+  const att = fighterFor(attSide), def = fighterFor(attSide==="p"?"e":"p");
+  const w = att.v.weapons[wi];
+  const d = byId(DATA.weapons, w.id);
+  const brg = bearing(att.st, def.st);
+  const chk = canFire(att, w, brg);
+  if(!chk.ok) return;
+  w.ammo--; att.st.heat -= d.heat;
+  const need = toHit(att, w, brg, def.st, called);
+  const roll = ri(1,100);
+  if(roll <= need){
+    const res = applyDamage(def.v, brg.hitFacing, rollDmg(d.dmg), called);
+    if(res.driver) def.st.drvPen++;
+    cLog(`${att.label}'s ${d.name}${called?" (called: "+called+")":""} hits — ${res.msg}`);
+  } else {
+    cLog(`${att.label}'s ${d.name} misses (${roll} vs ${need}%).`);
+  }
+  checkEnd();
+}
+function checkEnd(){
+  const c = G.combat;
+  if(c.done) return;
+  const pOut = isOut(vehicle()), eOut = isOut(c.foeV);
+  if(!pOut && !eOut) return;
+  c.done = true;
+  c.result = pOut ? "lose" : "win";
+  finishBout();
+}
+function finishBout(){
+  const c = G.combat;
+  if(c.applied) return;
+  c.applied = true;
+  const tier = byId(DATA.arena, c.tier);
+  G.campaign.flags.arena = G.campaign.flags.arena || {q:0,p:0,t:0};
+  if(c.result==="win"){
+    const firstWin = G.campaign.flags.arena[c.tier]===0;
+    const purse = firstWin ? tier.purse : tier.repeat;
+    const salvage = ri(5, 10 + G.driver.skills.scrounge*10);
+    G.campaign.flags.arena[c.tier]++;
+    G.scrap += purse + salvage;
+    G.driver.xp += tier.xp;
+    G.world.factionRep.militias += 1;
+    c.summary = { purse, salvage };
+    cLog(`${c.foe.name} is out! The crowd roars your name.`);
+    logMsg(`Crucible: beat ${c.foe.name}. Purse ${purse} + ${salvage} salvage scrap.`);
+  } else if(G.meta.ironman){
+    c.summary = { ironman:true };
+    cLog("Your rig dies around you. Ironman: this is where the story ends.");
+  } else {
+    const lost = Math.min(G.scrap, Math.max(10, Math.floor(G.scrap*0.2)));
+    G.scrap -= lost;
+    c.summary = { lost };
+    cLog(`Tow crews drag you out. The pit fee and vultures cost ${lost} scrap.`);
+    logMsg(`Crucible: lost to ${c.foe.name}. Towed out ${lost} scrap lighter.`);
+  }
+}
+function enemyTurn(){
+  const c = G.combat;
+  if(c.done) return;
+  const e = fighterFor("e"), p = fighterFor("p");
+  const es = vStats(c.foeV);
+  const brg = bearing(e.st, p.st);
+  // Preferred range = best live weapon's band
+  const live = c.foeV.weapons.filter(w=>!w.dmgd && w.ammo>0);
+  if(!live.length && !c.foeV.gear.some(g=>g.id==="ram")){
+    cLog(`${c.foe.name} throws up a hand — nothing left to fight with. The pit master calls it.`);
+    c.done = true; c.result = "win"; finishBout(); return;
+  }
+  const want = live.length ? Math.max(...live.map(w=>DATA.rngMax[byId(DATA.weapons,w.id).rng]))-1 : 1;
+  let spd = e.st.speed;
+  if(brg.dist > want) spd = Math.min(es.maxSpeed, spd+1);
+  else if(brg.dist < Math.max(1,want-1)) spd = Math.max(0, spd-1);
+  // Swerve toward player's lane when no arc lines up
+  if(e.st.lane !== p.st.lane && live.length && !live.some(w=>canFire(e,w,brg).ok))
+    e.st.lane += (p.st.lane > e.st.lane ? 1 : -1);
+  moveFighter(e, spd);
+  const brg2 = bearing(e.st, p.st);
+  live.forEach(w=>{
+    const wi = c.foeV.weapons.indexOf(w);
+    if(c.done) return;
+    if(canFire(e, w, brg2).ok){
+      // AI calls shots at the plant when the facing armor is stripped
+      const called = (vehicle().armor[brg2.hitFacing]===0 && rand()<0.35) ? "plant" : null;
+      fireWeapon("e", wi, called);
+    }
+  });
+}
+
+/* ---- combat player actions -------------------------------------------- */
+ACTIONS.startBout = d => {
+  const v = vehicle();
+  if(!v || !roadworthy(v)) return;
+  const tier = byId(DATA.arena, d.id);
+  if(tier.req && !(G.campaign.flags.arena||{})[tier.req]) return;
+  startBout(d.id);
+};
+ACTIONS.maneuver = d => {
+  const c = G.combat;
+  if(!c || c.done || c.phase!=="move") return;
+  const p = fighterFor("p");
+  const ps = vStats(p.v);
+  let spd = p.st.speed;
+  if(d.m==="accel") spd = Math.min(ps.maxSpeed, spd+1);
+  if(d.m==="brake") spd = Math.max(0, spd-2);
+  if(d.m==="boost"){ if(p.st.heat<2) return; p.st.heat-=2; spd = Math.min(ps.maxSpeed+1, spd+2); }
+  if(d.m==="swerveL"||d.m==="swerveR"){
+    const nl = p.st.lane + (d.m==="swerveL"?-1:1);
+    if(nl<0||nl>=LANES) return;
+    p.st.lane = nl;
+    if(ps.handling<0) spd = Math.max(0, spd-1);
+  }
+  if(d.m==="ram"){
+    const brg = bearing(p.st, c.e);
+    if(!(p.st.lane===c.e.lane && brg.arc==="F" && brg.dist<=Math.max(1,spd))) return;
+    p.st.pos = c.e.pos; p.st.speed = spd;
+    resolveRam("p");
+    checkEnd();
+    c.phase = "fire";
+    render();
+    return;
+  }
+  moveFighter(p, spd);
+  c.phase = "fire";
+  render();
+};
+ACTIONS.toggleCalled = () => {
+  const c = G.combat;
+  const order = [null,"tires","plant","weapon"];
+  c.called = order[(order.indexOf(c.called)+1)%order.length];
+  render();
+};
+ACTIONS.fire = d => {
+  const c = G.combat;
+  if(!c || c.done || c.phase!=="fire") return;
+  fireWeapon("p", +d.i, c.called);
+  render();
+};
+ACTIONS.endTurn = () => {
+  const c = G.combat;
+  if(!c || c.done) return;
+  if(!c.enemyFirst) enemyTurn();
+  if(!c.done) startRound(false);
+  render();
+};
+ACTIONS.concede = () => {
+  const c = G.combat;
+  if(!c || c.done) return;
+  if(!confirm("Concede the bout? You'll be towed out with a loss.")) return;
+  cLog("You raise a hand. The pit master waves it dead.");
+  c.done = true; c.result = "lose"; finishBout();
+  render();
+};
+ACTIONS.fightDone = () => {
+  const c = G.combat;
+  if(c.summary && c.summary.ironman){
+    localStorage.removeItem(SAVE_KEY);
+    G = newGame(); rng = mulberry32(G.meta.seed);
+    setScreen("title");
+    return;
+  }
+  G.combat = null;
+  setScreen("arena");
+};
 
 /* ---- screens ----------------------------------------------------------- */
 const SCREENS = {
@@ -535,7 +893,7 @@ const SCREENS = {
       <button data-act="go" data-to="market">The Rust Bucket Market<span class="sub">Ammo, fuel, supplies</span></button>
       <button data-act="go" data-to="jobs">Job Board<span class="sub">Shift work pays. Contracts need a rig — and a road.</span></button>
       <button data-act="go" data-to="bar">The Slag Bar<span class="sub">Rumors now. Recruits in Slice 4.</span></button>
-      <button disabled>The Crucible (Arena)<span class="sub">Qualifiers open in Slice 2</span></button>
+      <button data-act="go" data-to="arena">The Crucible (Arena)<span class="sub">Purses, glory, and dented steel</span></button>
       <h2>Log</h2>
       <div class="panel">${(G.log.length?G.log.slice(-6):["(nothing yet)"]).map(t=>`<p class="dim">${esc(t)}</p>`).join("")}</div>
       <button class="small" data-act="go" data-to="settings">Settings &amp; Saves</button>
@@ -586,6 +944,15 @@ const SCREENS = {
         <div class="kv"><span>Space</span><span>${s.spaceUsed} / ${s.space}${s.cargoSpace?` (+${s.cargoSpace} cargo)`:""}</span></div>
         <div class="kv"><span>Armor F/L/R/B/T</span><span>${v.armor.F}/${v.armor.L}/${v.armor.R}/${v.armor.B}/${v.armor.T}</span></div>
       </div>
+      ${vDamaged(v)?`<h2>Damage</h2>
+      <div class="panel">
+        ${s.dmg.hull?`<div class="kv"><span>Hull</span><span class="warn">${s.hull}/${s.hullMax}</span></div>`:""}
+        ${s.dmg.tires?`<div class="kv"><span>Tires shredded</span><span class="warn">${s.dmg.tires}</span></div>`:""}
+        ${s.dmg.plant?`<div class="kv"><span>Power plant hits</span><span class="warn">${s.dmg.plant}/2</span></div>`:""}
+        ${v.weapons.filter(w=>w.dmgd).map(w=>`<div class="kv"><span>${byId(DATA.weapons,w.id).name}</span><span class="warn">smashed</span></div>`).join("")}
+        <button class="primary small" data-act="repair" ${G.scrap<repairCost(v)?"disabled":""}>Full repair — ${repairCost(v)} scrap${G.driver.skills.mechanics?` (Mechanics discount)`:""}</button>
+        <p class="dim">Chipped armor isn't damage — re-plate it in the Workshop.</p>
+      </div>`:""}
       <h2>Mounted</h2>
       <div class="panel">${wpns}${gear}</div>
       <button class="primary" data-act="go" data-to="workshop">Open the Workshop</button>
@@ -738,6 +1105,114 @@ const SCREENS = {
     </main>`));
   },
 
+  arena(app){
+    app.appendChild(headerBar());
+    const v = vehicle();
+    const wins = G.campaign.flags.arena || (G.campaign.flags.arena = {q:0,p:0,t:0});
+    const ready = v && roadworthy(v);
+    const readyLine = !v ? '<span class="warn">You need a rig. The yard sells chassis.</span>'
+      : !v.plant ? '<span class="warn">Your rig has no power plant.</span>'
+      : !roadworthy(v) ? '<span class="warn">Your rig is overloaded — shed weight first.</span>'
+      : vDamaged(v) ? '<span class="warn">Your rig carries damage. Fighting like this is a choice.</span>'
+      : '<span class="good">Your rig is ready.</span>';
+    const rows = DATA.arena.map(t=>{
+      const locked = t.req && !wins[t.req];
+      const w = wins[t.id];
+      return `<button data-act="startBout" data-id="${t.id}" ${locked||!ready?"disabled":""}>
+        ${t.name} — ${w? t.repeat : t.purse} scrap${w?` (repeat)`:""}
+        <span class="sub">${locked ? "Win the previous bout to unlock." : t.pitch}</span>
+        <span class="sub">vs ${t.foe.name} · ${byId(DATA.chassis,t.foe.v.chassis).name}${w?` · beaten ×${w}`:""}</span>
+      </button>`;
+    }).join("");
+    app.appendChild(el(`<main>
+      ${hero("arena")}
+      <h2>The Crucible</h2>
+      <p class="flavor">A pit of packed slag ringed in weld-scarred bleachers. The militia takes its cut; the crowd takes the rest.</p>
+      <div class="panel"><p>${readyLine}</p></div>
+      ${rows}
+      ${backBtn()}
+    </main>`));
+  },
+
+  fight(app){
+    const c = G.combat;
+    if(!c){ setScreen("arena"); return; }
+    const v = vehicle();
+    const ps = vStats(v), es = vStats(c.foeV);
+    const brg = bearing(c.p, c.e);
+    const dirWord = brg.arc==="F"?"ahead":brg.arc==="B"?"behind":"beside you";
+
+    // track: bands drawn top-down so "forward" reads as up
+    let cells = "";
+    for(let band=TRACK-1; band>=0; band--){
+      for(let lane=0; lane<LANES; lane++){
+        const p = c.p.pos===band && c.p.lane===lane;
+        const e = c.e.pos===band && c.e.lane===lane;
+        cells += `<div class="cell ${p&&e?"pe":p?"p":e?"e":""}">${p&&e?"P·E":p?"P":e?"E":""}</div>`;
+      }
+    }
+    const heatPips = n=>`<span class="pips">${"●".repeat(Math.max(0,n)).split("").map(x=>'<span class="on">●</span>').join("")}${'<span class="off">●</span>'.repeat(Math.max(0,ps.heatCap-n))}</span>`;
+    const hullPips = (h,m)=>`<span class="pips hullpips">${'<span class="on">■</span>'.repeat(Math.max(0,h))}${'<span class="off">■</span>'.repeat(Math.max(0,m-h))}</span>`;
+
+    let controls = "";
+    if(c.done){
+      const s = c.summary||{};
+      controls = `<div class="panel">
+        ${c.result==="win"
+          ? `<p class="good"><b>VICTORY.</b> Purse ${s.purse} scrap, salvage ${s.salvage} more. The militia nods. That means a lot here.</p>`
+          : s.ironman
+            ? `<p class="warn"><b>WRECKED.</b> Ironman: the Gravel Sea keeps what it takes. This save is over.</p>`
+            : `<p class="warn"><b>WRECKED.</b> Tow crews haul you out, ${s.lost} scrap lighter. Your rig — and pride — need work.</p>`}
+        <button class="primary" data-act="fightDone">${s.ironman?"Accept it":"Leave the pit"}</button>
+      </div>`;
+    } else if(c.phase==="move"){
+      const ramOk = c.p.lane===c.e.lane && brg.arc==="F" && brg.dist<=Math.max(1,c.p.speed);
+      controls = `<h2>Round ${c.round} — maneuver</h2>
+      <div class="btnrow">
+        <button data-act="maneuver" data-m="accel" ${c.p.speed>=ps.maxSpeed?"disabled":""}>Accelerate</button>
+        <button data-act="maneuver" data-m="coast">Coast</button>
+        <button data-act="maneuver" data-m="brake" ${c.p.speed<=0?"disabled":""}>Brake</button>
+        <button data-act="maneuver" data-m="swerveL" ${c.p.lane<=0?"disabled":""}>Swerve L</button>
+        <button data-act="maneuver" data-m="boost" ${c.p.heat<2?"disabled":""}>Boost (2♨)</button>
+        <button data-act="maneuver" data-m="swerveR" ${c.p.lane>=LANES-1?"disabled":""}>Swerve R</button>
+      </div>
+      ${ramOk?`<button class="danger" data-act="maneuver" data-m="ram">RAM ${esc(c.foe.name)}<span class="sub">2d6+speed to them, 1d6 recoil to you${v.gear.some(g=>g.id==="ram")?" — ram plate doubles it":""}</span></button>`:""}
+      <button class="small" data-act="concede">Concede the bout (take the loss)</button>`;
+    } else {
+      const wpnBtns = v.weapons.map((w,i)=>{
+        const d = byId(DATA.weapons,w.id);
+        const chk = canFire(fighterFor("p"), w, brg);
+        const pct = toHit(fighterFor("p"), w, brg, c.e, c.called);
+        return `<button data-act="fire" data-i="${i}" ${chk.ok?"":"disabled"}>
+          ${d.name} (${w.facing==="T"?"Turret":w.facing}) — ${chk.ok?pct+"%":chk.why}
+          <span class="sub">${d.dmg} dmg · ammo ${w.ammo}/${d.ammo} · heat ${d.heat}</span>
+        </button>`;
+      }).join("");
+      controls = `<h2>Round ${c.round} — fire</h2>
+      <button class="small" data-act="toggleCalled">Called shot: <b>${c.called?c.called.toUpperCase()+" (−25%)":"OFF"}</b></button>
+      ${wpnBtns}
+      <button class="primary" data-act="endTurn">End turn</button>`;
+    }
+
+    const app_ = el(`<main>
+      <div class="panel" style="gap:4px">
+        <div class="kv"><b class="warn">${esc(c.foe.name)}</b><span>${es.ch.name} · ${dirWord}, ${brg.dist} band${brg.dist===1?"":"s"}</span></div>
+        <div class="kv"><span>Hull ${hullPips(es.hull,es.hullMax)}</span><span>Spd ${c.e.speed}</span></div>
+        <div class="kv"><span>Armor F/L/R/B</span><span>${c.foeV.armor.F}/${c.foeV.armor.L}/${c.foeV.armor.R}/${c.foeV.armor.B}</span></div>
+      </div>
+      <div class="track">${cells}</div>
+      <div class="panel" style="gap:4px">
+        <div class="kv"><b>${esc(v.name)}</b><span>Spd ${c.p.speed}/${ps.maxSpeed} · you fire on its <b>${brg.hitFacing}</b></span></div>
+        <div class="kv"><span>Hull ${hullPips(ps.hull,ps.hullMax)}</span><span>Heat ${heatPips(c.p.heat)}</span></div>
+        <div class="kv"><span>Armor F/L/R/B</span><span>${v.armor.F}/${v.armor.L}/${v.armor.R}/${v.armor.B}</span></div>
+        ${c.p.drvPen?`<div class="kv"><span class="warn">Driver hit</span><span class="warn">−${c.p.drvPen} to skills</span></div>`:""}
+      </div>
+      ${controls}
+      <div class="panel">${c.log.slice(-6).map(t=>`<p class="dim" style="font-size:13.5px">${esc(t)}</p>`).join("")}</div>
+    </main>`);
+    app.appendChild(app_);
+  },
+
   settings(app){
     app.appendChild(headerBar());
     const m = el(`<main>
@@ -792,6 +1267,7 @@ const SCREENS = {
   if(loaded){ G = loaded; reseedRng(); }
   else { G = newGame(); rng = mulberry32(G.meta.seed); G.screen = "title"; }
   if(!SCREENS[G.screen]) G.screen = "title";
+  if(G.screen==="fight" && !G.combat) G.screen = "arena";
   if(G.campaign.flags.started && !G.driver.created && G.screen!=="title" && G.screen!=="settings") G.screen = "create";
   render();
 })();

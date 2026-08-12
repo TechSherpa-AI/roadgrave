@@ -36,7 +36,7 @@ gaps live in the `NOTES` comment block at the top of `index.html`.
 |---|---|---|
 | 0 | Scaffold: UI shell, state machine, saves, export/import | ✅ |
 | 1 | Driver creation, workshop, garage/economy | ✅ |
-| 2 | Arena tactical combat | — |
+| 2 | Arena tactical combat | ✅ |
 | 3 | Overland map, one city, scavenging | — |
 | 4 | Crew and convoy | — |
 | 5 | Campaign spine and progression | — |
