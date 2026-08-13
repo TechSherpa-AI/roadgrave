@@ -158,6 +158,14 @@
   .hullpips .on{color:var(--green);} .hullpips .off{color:#3a4048;}
   .btnrow{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
   .btnrow button{min-height:46px; text-align:center; font-size:15px; padding:6px;}
+
+  /* reflex-task zones: huge one-thumb targets */
+  .pestzone{min-height:110px; display:flex; align-items:center; justify-content:center;
+    gap:12px; font-size:15px; position:relative; text-align:center;}
+  .pestzone .zlabel{color:var(--dim); letter-spacing:.2em; font-size:13px;}
+  .pestzone.active{border-color:var(--amber); background:#2a2410;}
+  .pestzone .pest{font-size:34px; color:var(--amber); animation:skitter .5s infinite alternate;}
+  @keyframes skitter{ from{transform:translateX(-6px);} to{transform:translateX(6px);} }
 </style>
 </head>
 <body>

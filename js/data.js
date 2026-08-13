@@ -44,14 +44,6 @@ export const DATA = {
     { id:"rack",    name:"Cargo Rack",   cost:60,  wt:30,  space:0, blurb:"+4 cargo space for jobs and loot." },
     { id:"ring",    name:"Ring Mount",   cost:130, wt:50,  space:1, blurb:"Lets one weapon traverse 360° (Turret facing)." },
   ],
-  shifts: [
-    { id:"wrench", name:"Wrench shift at the garage", base:50, var:10, skill:"mechanics",
-      flavor:"Elbow-deep in someone else's bad decisions." },
-    { id:"wall",   name:"Wall guard rotation",        base:40, var:15, skill:"gunnery",
-      flavor:"Eight hours staring at the Gravel Sea, rifle in hand." },
-    { id:"sort",   name:"Salvage sorting",            base:35, var:10, skill:"scrounge",
-      flavor:"One town's slag is another town's dinner." },
-  ],
   rngMax:{ Close:2, Medium:4, Long:6 },
   weaponFacings:[["F","Front"],["L","Left"],["R","Right"],["B","Rear"]],
 
@@ -83,6 +75,18 @@ export const DATA = {
             personalityTags:["honorable","ambitious"], motivationTags:["legacy","dominance"] },
     grix: { id:"grix", name:"Grix Redline",   faction:"gangs",
             personalityTags:["bloodthirsty","sadistic"], motivationTags:["blood","reputation"] },
+    marlo:{ id:"marlo", name:"Marlo of the Rust Bucket", faction:"merchants",
+            personalityTags:["greedy","opportunistic"], motivationTags:["profit","standing"] },
+    weld: { id:"weld", name:"Weld", faction:"mechanics",
+            personalityTags:["honorable","loyal"], motivationTags:["craft","community"] },
+    harsk:{ id:"harsk", name:"Sergeant Harsk", faction:"militia",
+            personalityTags:["honorable","ideological"], motivationTags:["order","duty"] },
+    finch:{ id:"finch", name:"Finch", faction:"civilians",
+            personalityTags:["desperate","frightened"], motivationTags:["survival","family"] },
+    marek:{ id:"marek", name:"Old Marek", faction:"civilians",
+            personalityTags:["honorable","loyal"], motivationTags:["memory","routine"] },
+    bubba:{ id:"bubba", name:"Bubba BigRig", faction:"raiders",
+            personalityTags:["sadistic","opportunistic"], motivationTags:["toll","flamingos"] },
   },
 
   /* ---- Crucible tiers. Reactive dialogue lives in data-dialogue.js;

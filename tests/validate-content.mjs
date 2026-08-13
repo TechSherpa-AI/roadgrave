@@ -8,6 +8,8 @@ import { LINES } from "../js/data-dialogue.js";
 import { ARCHETYPES } from "../js/data-legacy.js";
 import { DATA } from "../js/data.js";
 import { newGame } from "../js/core.js";
+import { CONTRACTS, RUMORS, DISPUTE_TRUTHS, DISPUTE_WITNESS, FUTURE_ENCOUNTERS } from "../js/data-jobs.js";
+import { JOURNAL_TYPES } from "../js/world.js";
 
 let errors = [];
 const err = (m)=>errors.push(m);
@@ -128,9 +130,167 @@ for(const ctx of KNOWN_CTX)
   }
 }
 
+/* ---- shared effects shape (jobs, rumors, disputes, dialogue) ----------- */
+const FX_FIELDS = new Set(["scrap","rep","factions","npcRelationship","npcRelationships",
+  "career","historyFlags","setFlags","incFlags","journal","unlocks"]);
+const FACTIONS = new Set(["militia","merchants","mechanics","scavengers","crucible",
+  "civilians","gangs","raiders","zealots"]);
+const SKILLS = new Set(["driving","gunnery","mechanics","scrounge"]);
+function checkFx(fx, tag){
+  if(!fx) return;
+  for(const k of Object.keys(fx)) if(!FX_FIELDS.has(k)) err(`${tag}: unknown effect field '${k}'`);
+  if(fx.rep) for(const k of Object.keys(fx.rep)) if(!REP_KEYS.has(k)) err(`${tag}: unknown rep '${k}'`);
+  if(fx.factions) for(const k of Object.keys(fx.factions)) if(!FACTIONS.has(k)) err(`${tag}: unknown faction '${k}'`);
+  if(fx.npcRelationships) for(const k of Object.keys(fx.npcRelationships)) if(!NPC_IDS.has(k)) err(`${tag}: unknown npc '${k}'`);
+  if(fx.journal && !JOURNAL_TYPES.includes(fx.journal.type)) err(`${tag}: unknown journal type '${fx.journal.type}'`);
+}
+
+/* ---- contracts --------------------------------------------------------- */
+{
+  const RISKS = new Set(["low","medium","high"]);
+  const FAMILIES = new Set(["decision","knowledge","reflex"]);
+  const ids = new Set();
+  const rumorIds = new Set(RUMORS.map(r=>r.id));
+  for(const c of CONTRACTS){
+    const tag = "contract "+(c.id||"(no id)");
+    if(!c.id) err("contract missing id");
+    else if(ids.has(c.id)) err("duplicate contract id "+c.id); else ids.add(c.id);
+    for(const f of ["title","family","employerNpcId","employerFaction","description",
+                    "paymentRange","timeCost","risk","tags","journalType"])
+      if(c[f]===undefined) err(`${tag}: missing ${f}`);
+    if(!FAMILIES.has(c.family)) err(`${tag}: unknown family '${c.family}'`);
+    if(!NPC_IDS.has(c.employerNpcId)) err(`${tag}: unknown employer npc '${c.employerNpcId}'`);
+    if(!FACTIONS.has(c.employerFaction)) err(`${tag}: unknown employer faction '${c.employerFaction}'`);
+    if(!Array.isArray(c.paymentRange) || c.paymentRange.length!==2
+       || c.paymentRange[0]>c.paymentRange[1] || c.paymentRange[0]<0)
+      err(`${tag}: impossible payment range`);
+    if(!RISKS.has(c.risk)) err(`${tag}: unknown risk '${c.risk}'`);
+    if(![0,1].includes(c.timeCost)) err(`${tag}: timeCost must be 0 or 1`);
+    if(!JOURNAL_TYPES.includes(c.journalType)) err(`${tag}: unknown journalType '${c.journalType}'`);
+    if(c.paymentDispute && !(c.paymentDispute.chance>0 && c.paymentDispute.chance<=1))
+      err(`${tag}: paymentDispute.chance must be in (0,1]`);
+    checkFx(c.successEffects, tag+".success"); checkFx(c.partialEffects, tag+".partial");
+    checkFx(c.failureEffects, tag+".failure");
+    if(c.family==="decision"){
+      if(!Array.isArray(c.approaches) || !c.approaches.length) err(`${tag}: decision contract needs approaches`);
+      const aids = new Set();
+      for(const a of c.approaches||[]){
+        const at = tag+"."+(a.id||"?");
+        if(!a.id || aids.has(a.id)) err(`${at}: missing/duplicate approach id`); else aids.add(a.id);
+        if(!a.label || !a.description) err(`${at}: missing label/description`);
+        if(a.skill && !SKILLS.has(a.skill)) err(`${at}: unknown skill '${a.skill}'`);
+        if(a.repStat && !REP_KEYS.has(a.repStat)) err(`${at}: unknown repStat '${a.repStat}'`);
+        if(!a.skill && !a.repStat && !a.noCheck) err(`${at}: needs skill, repStat, or noCheck`);
+        if(a.requiredRep) for(const k of Object.keys(a.requiredRep)) if(!REP_KEYS.has(k)) err(`${at}: bad requiredRep '${k}'`);
+        if(a.requiredFactionRep) for(const k of Object.keys(a.requiredFactionRep)) if(!FACTIONS.has(k)) err(`${at}: bad requiredFactionRep '${k}'`);
+        checkFx(a.successEffects, at+".success"); checkFx(a.partialEffects, at+".partial");
+        checkFx(a.failureEffects, at+".failure");
+      }
+    }
+    if(c.family==="knowledge"){
+      if(!Array.isArray(c.questions) || c.questions.length!==3) err(`${tag}: knowledge contract needs exactly 3 questions`);
+      for(const q of c.questions||[]){
+        if(!q.id || !q.text || !Array.isArray(q.options)) err(`${tag}: malformed question`);
+        else if(q.correct===undefined || q.correct<0 || q.correct>=q.options.length)
+          err(`${tag}.${q.id}: correct index out of range`);
+        if(q.rumorHint && !rumorIds.has(q.rumorHint)) err(`${tag}.${q.id}: unknown rumorHint '${q.rumorHint}'`);
+      }
+    }
+    if(c.family==="reflex"){
+      const r = c.reflex||{};
+      if(!r.targets || !Array.isArray(r.zones) || r.zones.length<2 || !r.payPerHit || !r.windowMs)
+        err(`${tag}: malformed reflex definition`);
+      else if(r.targets*r.payPerHit < c.paymentRange[1])
+        err(`${tag}: max payout unreachable (targets*payPerHit < paymentRange max)`);
+    }
+    if(c.requirements){
+      const reqs = c.requirements.any || [c.requirements];
+      for(const r of reqs){
+        if(r.skills) for(const k of Object.keys(r.skills)) if(!SKILLS.has(k)) err(`${tag}: bad requirement skill '${k}'`);
+        if(r.rep) for(const k of Object.keys(r.rep)) if(!REP_KEYS.has(k)) err(`${tag}: bad requirement rep '${k}'`);
+        if(r.factionRep) for(const k of Object.keys(r.factionRep)) if(!FACTIONS.has(k)) err(`${tag}: bad requirement faction '${k}'`);
+      }
+    }
+  }
+  if(!CONTRACTS.some(c=>c.family==="knowledge" && (c.questions||[]).some(q=>q.rumorHint)))
+    err("contracts: no knowledge contract carries a Slag Bar rumor hint");
+}
+
+/* ---- rumors ------------------------------------------------------------ */
+{
+  const RELIABILITY = new Set(["accurate","incomplete","exaggerated","outdated","mistaken","planted"]);
+  const ids = new Set();
+  for(const r of RUMORS){
+    const tag = "rumor "+(r.id||"(no id)");
+    if(!r.id || ids.has(r.id)) err(tag+": missing/duplicate id"); else ids.add(r.id);
+    for(const f of ["text","sourceDisplayName","location","relatedJobTags","reliability","hintText"])
+      if(r[f]===undefined) err(`${tag}: missing ${f}`);
+    if(r.sourceNpcId && !NPC_IDS.has(r.sourceNpcId)) err(`${tag}: unknown source npc`);
+    if(r.relatedNpcIds) r.relatedNpcIds.forEach(n=>{ if(!NPC_IDS.has(n)) err(`${tag}: unknown related npc '${n}'`); });
+    if(r.relatedFaction && !FACTIONS.has(r.relatedFaction)) err(`${tag}: unknown faction`);
+    if(!RELIABILITY.has(r.reliability)) err(`${tag}: unknown reliability '${r.reliability}'`);
+    checkFx(r.effects, tag);
+  }
+  // every non-bubba rumor's job tags reach at least one contract
+  for(const r of RUMORS){
+    if(r.relatedEncounterTags) continue;
+    if(!CONTRACTS.some(c=>c.tags.some(t=>r.relatedJobTags.includes(t))))
+      err("rumor "+r.id+": relatedJobTags match no contract");
+  }
+}
+
+/* ---- payment disputes -------------------------------------------------- */
+{
+  for(const t of DISPUTE_TRUTHS){
+    const tag = "disputeTruth "+t.id;
+    for(const f of ["cash","hidden","future"]){
+      const rng = t[f];
+      if(!Array.isArray(rng) || rng.length!==2 || rng[0]>rng[1] || rng[0]<0 || rng[1]>1)
+        err(`${tag}: ${f} percentage range invalid`);
+    }
+    if(!(t.weight>0)) err(tag+": weight must be > 0");
+  }
+  for(const k of Object.keys(DISPUTE_WITNESS))
+    if(!FACTIONS.has(k)) err("disputeWitness: unknown faction "+k);
+}
+
+/* ---- future encounter fixtures ----------------------------------------- */
+{
+  const rumorIds = new Set(RUMORS.map(r=>r.id));
+  for(const e of FUTURE_ENCOUNTERS){
+    const tag = "encounter "+e.id;
+    if(e.enabled) err(tag+": future encounters must remain disabled before Slice 3");
+    if(!e.special || !rumorIds.has(e.special.requiresRumor)) err(tag+": special option needs a real rumor");
+    if(!NPC_IDS.has(e.npc)) err(tag+": unknown npc");
+    if(!(e.options||[]).length) err(tag+": needs baseline options");
+  }
+}
+
+/* ---- player-facing currency audit: scrap, never caps ------------------- */
+{
+  const ALLOWLIST = [];   // strings verified as unrelated lore may be listed here
+  const offenders = [];
+  const scan = (text, where)=>{
+    if(typeof text!=="string") return;
+    if(/\bcaps?\b/i.test(text) && !ALLOWLIST.includes(text)) offenders.push(where+": "+text.slice(0,60));
+  };
+  LINES.forEach(e=>e&&scan(e.text, "dialogue "+e.id));
+  RUMORS.forEach(r=>{ scan(r.text,"rumor "+r.id); scan(r.hintText,"rumor "+r.id+".hint"); scan(r.signal,"rumor "+r.id+".signal"); });
+  CONTRACTS.forEach(c=>{
+    scan(c.title,"contract "+c.id); scan(c.description,"contract "+c.id);
+    (c.approaches||[]).forEach(a=>{ scan(a.label,c.id+"."+a.id); scan(a.description,c.id+"."+a.id); });
+    (c.questions||[]).forEach(q=>{ scan(q.text,c.id+"."+q.id); (q.options||[]).forEach(o=>scan(o,c.id+"."+q.id)); });
+  });
+  Object.values(ARCHETYPES).flat().forEach(a=>{ scan(a.name,"legacy "+a.id); scan(a.text,"legacy "+a.id); });
+  DATA.arena.forEach(t=>{ scan(t.pitch,"arena "+t.id); (t.intro||[]).forEach(x=>scan(x,"arena "+t.id));
+    scan(t.winText,"arena "+t.id); scan(t.loseText,"arena "+t.id); });
+  FUTURE_ENCOUNTERS.forEach(e=>{ (e.special.narrative||[]).forEach(x=>scan(x,"encounter "+e.id)); scan(e.special.recallLine,"encounter "+e.id); });
+  offenders.forEach(o=>err("currency: player-facing 'caps' — "+o));
+}
+
 if(errors.length){
   console.error("CONTENT VALIDATION FAILED:");
   errors.forEach(e=>console.error("  ✗", e));
   process.exit(1);
 }
-console.log(`content validation passed (${LINES.length} dialogue entries, ${Object.values(ARCHETYPES).flat().length} archetypes)`);
+console.log(`content validation passed (${LINES.length} dialogue entries, ${Object.values(ARCHETYPES).flat().length} archetypes, ${CONTRACTS.length} contracts, ${RUMORS.length} rumors)`);

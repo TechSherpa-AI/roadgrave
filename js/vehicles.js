@@ -57,7 +57,8 @@ export function vDamaged(v){
 }
 export function repairCost(v){
   const raw = v.dmg.hull*6 + v.dmg.tires*8 + v.dmg.plant*20 + v.weapons.filter(w=>w.dmgd).length*12;
-  const disc = Math.min(0.25, G.player.skills.mechanics*0.05);
+  let disc = Math.min(0.25, G.player.skills.mechanics*0.05);
+  if(G.history.weldFavor) disc = Math.min(0.30, disc + 0.05);   // Weld remembers the manifold
   return Math.ceil(raw*(1-disc));
 }
 

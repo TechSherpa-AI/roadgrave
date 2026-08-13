@@ -65,7 +65,17 @@ const JOURNAL_PROSE = {
   majorRepair:d=>`${d.vname} rebuilt at the garage — ${d.cost} scrap of hammered steel and new welds.`,
   retired:    d=>`Hung up the wheel. Final legacy: ${d.legacy}.`,
   died:       d=>`The Gravel Sea kept what it took. Ironman career ended by ${d.foe||"the road"}.`,
+  contractDone:   d=>`Contract ${d.outcome}: "${d.title}" for ${d.employer}.${d.disputed?" The pay is... pending.":(d.payment?` Paid ${d.payment} scrap.`:"")}`,
+  contractFailed: d=>`Failed "${d.title}" for ${d.employer}. Kettle Rock keeps score.`,
+  contractExpired:d=>`Left "${d.title}" unfinished (${d.kind}). ${d.employer} won't forget.`,
+  contractNote:   d=>d.text,
+  rumor:      d=>`Heard at the bar (${d.source}): ${d.text}`,
+  knowledge:  d=>`${d.title}: ${d.correct}/${d.total} right — ${d.payout} scrap.`,
+  reflex:     d=>`${d.title}: ${d.hits}/${d.targets} pests down — ${d.payout} scrap.`,
+  dispute:    d=>`Payment dispute with ${d.employer}: ${d.choice}. Recovered ${d.recovered}${d.owed?` of ${d.promised}`:""} scrap.`,
+  debt:       d=>`Debt update — ${d.npc}: ${d.event}${d.amount?` (${d.amount} scrap)`:""}.`,
 };
+export const JOURNAL_TYPES = Object.keys(JOURNAL_PROSE);
 export function addJournal(type, data={}){
   try{
     const prose = JOURNAL_PROSE[type];
@@ -109,8 +119,16 @@ export function workShift(){
 
 /* ---- market resources ------------------------------------------------- */
 export const RESOURCE_PRICES = { fuel:{cost:15, qty:10}, water:{cost:8, qty:5}, food:{cost:10, qty:5} };
-export function buyResource(kind){
+/* contract consequences change prices: Marlo's trust earns market rates */
+export function resourcePrice(kind){
   const p = RESOURCE_PRICES[kind];
+  if(!p) return null;
+  let cost = p.cost;
+  if(G.history.stallguardTrust && kind==="fuel") cost -= 2;
+  return { cost, qty:p.qty };
+}
+export function buyResource(kind){
+  const p = resourcePrice(kind);
   if(!p || !spend(p.cost)) return false;
   G.world[kind] += p.qty;
   save();

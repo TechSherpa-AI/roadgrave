@@ -7,6 +7,8 @@ import { DATA, byId } from "./data.js";
 import * as W from "./world.js";
 import * as V from "./vehicles.js";
 import * as C from "./combat.js";
+import * as J from "./jobs.js";
+import * as DIS from "./disputes.js";
 import { evaluate } from "./legacy.js";
 import { GOLDEN } from "./golden.js";
 
@@ -111,8 +113,63 @@ ACTIONS.reload     = d => { V.reloadWeapon(+d.i); render(); };
 ACTIONS.refill     = d => { V.refillGear(+d.i); render(); };
 ACTIONS.repair     = () => { V.repairVehicle(); render(); };
 ACTIONS.buyRes     = d => { W.buyResource(d.kind); render(); };
-ACTIONS.workShift  = d => { W.workShift(d.id); render(); };
-ACTIONS.rumor      = () => { W.buyRumor(); render(); };
+ACTIONS.labor      = () => { W.workShift(); render(); };
+ACTIONS.rumor      = () => { J.buySlagRound(); render(); };
+
+/* ---- job board wrappers ------------------------------------------------ */
+let lastOutcome = null;                 // transient: outcome panel content
+let rememberShown = {};                 // transient: revealed hints this view
+ACTIONS.acceptContract = d => { if(J.acceptContract(d.id)) setScreen("contract"); };
+ACTIONS.abandonContract = () => {
+  if(!confirm("Walk away from this contract? Kettle Rock remembers who finishes jobs.")) return;
+  J.abandonContract(); lastOutcome = null; setScreen("jobs");
+};
+ACTIONS.approach = d => {
+  const res = J.resolveApproach(d.id);
+  if(res){ lastOutcome = res; rememberShown = {}; setScreen("jobs"); }
+};
+ACTIONS.remember = d => {
+  const hint = J.pressRemember(d.id);
+  if(hint){ rememberShown[d.id] = hint; render(); }
+};
+ACTIONS.startQuiz = d => { if(J.startQuiz(d.id)){ rememberShown={}; setScreen("quiz"); } };
+ACTIONS.answerQuiz = d => {
+  const st = J.answerQuiz(d.cid, +d.i);
+  if(st && st.done){ lastOutcome = { quiz:true, cid:d.cid, correct:st.correct }; setScreen("jobs"); }
+  else render();
+};
+ACTIONS.disputeChoice = d => {
+  const r = DIS.resolveDispute(d.id, d.choice);
+  if(r){ lastOutcome = { dispute:true, text:r.text, recovered:r.recovered }; render(); }
+};
+
+/* ---- reflex (pest control) --------------------------------------------- */
+let pestTimer = null;
+function pestTick(){
+  clearTimeout(pestTimer);
+  if(G.screen!=="pest"){ return; }
+  const run = G.jobs.reflex.run;
+  if(!run || run.done){ render(); return; }
+  const zone = J.reflexSpawn();
+  render();
+  if(zone===null){ return; }            // finished inside spawn
+  const c = J.contractById(run.cid);
+  pestTimer = setTimeout(()=>{
+    J.reflexTimeout();
+    pestTick();
+  }, c.reflex.windowMs);
+}
+ACTIONS.startPest = d => {
+  const run = J.startReflex(d.id);
+  if(run){ setScreen("pest"); pestTick(); }
+};
+ACTIONS.pestTap = d => {
+  clearTimeout(pestTimer);
+  J.reflexTap(d.zone);
+  setTimeout(pestTick, 350);
+  render();
+};
+ACTIONS.pestDone = () => { lastOutcome=null; setScreen("jobs"); };
 
 /* ---- combat wrappers -------------------------------------------------- */
 ACTIONS.startBout   = d => { C.startBout(d.id); };
@@ -402,19 +459,20 @@ export const SCREENS = {
       return `<button class="small" data-act="reload" data-i="${i}" ${w.ammo>=d.ammo||G.scrap<cost?"disabled":""}>
         ${d.name}: ${w.ammo}/${d.ammo}${cost>0?" — reload "+cost+" scrap":" — full"}</button>`;
     }).join("") : "";
-    const P = W.RESOURCE_PRICES;
+    const pf = W.resourcePrice("fuel"), pw = W.resourcePrice("water"), pd = W.resourcePrice("food");
     app.appendChild(el(`<main>
       ${hero("market")}
       <h2>The Rust Bucket Market</h2>
       <p class="flavor">Hanging tarps, hissing lamps, prices scratched on slate. Everything's negotiable except the exits.</p>
+      ${G.history.stallguardTrust?'<p class="flavor">Marlo\'s people wave you toward the good pumps — stall-watcher rates.</p>':""}
       <div class="panel">
         <div class="kv"><span>Fuel</span><b>${G.world.fuel} units</b></div>
         <div class="kv"><span>Water</span><b>${G.world.water}</b></div>
         <div class="kv"><span>Food</span><b>${G.world.food}</b></div>
       </div>
-      <button data-act="buyRes" data-kind="fuel" ${G.scrap<P.fuel.cost?"disabled":""}>Buy fuel — ${P.fuel.cost} scrap<span class="sub">+${P.fuel.qty} units. The road runs on it (Slice 3).</span></button>
-      <button data-act="buyRes" data-kind="water" ${G.scrap<P.water.cost?"disabled":""}>Buy water — ${P.water.cost} scrap<span class="sub">+${P.water.qty}. Nobody crosses the Gravel Sea dry.</span></button>
-      <button data-act="buyRes" data-kind="food" ${G.scrap<P.food.cost?"disabled":""}>Buy food — ${P.food.cost} scrap<span class="sub">+${P.food.qty} rations. Matters when you have a crew (Slice 4).</span></button>
+      <button data-act="buyRes" data-kind="fuel" ${G.scrap<pf.cost?"disabled":""}>Buy fuel — ${pf.cost} scrap<span class="sub">+${pf.qty} units. The road runs on it (Slice 3).</span></button>
+      <button data-act="buyRes" data-kind="water" ${G.scrap<pw.cost?"disabled":""}>Buy water — ${pw.cost} scrap<span class="sub">+${pw.qty}. Nobody crosses the Gravel Sea dry.</span></button>
+      <button data-act="buyRes" data-kind="food" ${G.scrap<pd.cost?"disabled":""}>Buy food — ${pd.cost} scrap<span class="sub">+${pd.qty} rations. Matters when you have a crew (Slice 4).</span></button>
       ${v && v.weapons.length ? `<h2>Ammo</h2>${ammoRows}` : ""}
       <p class="dim">Parts and weapons are fitted at the Workshop. Faction prices arrive with reputation.</p>
       ${backBtn()}
@@ -423,18 +481,162 @@ export const SCREENS = {
 
   jobs(app){
     app.appendChild(headerBar());
-    const rows = DATA.shifts.map(j=>`
-      <button data-act="workShift" data-id="${j.id}">
-        ${j.name}<span class="sub">${j.flavor}</span>
-        <span class="sub">~${j.base + G.player.skills[j.skill]*5} scrap (${byId(DATA.skills,j.skill).name} helps) · takes 1 day</span>
-      </button>`).join("");
+    const active = G.jobs.active ? J.contractById(G.jobs.active.cid) : null;
+    const offers = J.offersForToday();
+    const dispute = DIS.openDispute();
+
+    /* outcome panel: last committed resolution / dispute result */
+    let outcomeHtml = "";
+    if(lastOutcome){
+      if(lastOutcome.dispute){
+        outcomeHtml = `<div class="panel"><p class="flavor">${esc(lastOutcome.text)}</p>
+          ${lastOutcome.recovered?`<p>Recovered: <b>${lastOutcome.recovered}</b> scrap.</p>`:""}</div>`;
+      } else if(lastOutcome.quiz){
+        outcomeHtml = `<div class="panel"><p class="good">Quiz done — ${lastOutcome.correct}/3 right. Scrap's in your pocket.</p></div>`;
+      } else {
+        const r = lastOutcome;
+        const sum = (r.summary||[]).map(s=>`<p class="dim" style="font-size:14px">· ${esc(s)}</p>`).join("");
+        outcomeHtml = `<div class="panel">
+          <p class="${r.outcome==="failure"?"warn":"good"}"><b>${r.outcome.toUpperCase()}</b>${r.payment?` — ${r.payment} scrap`:""}${r.disputeId?" — payment withheld…":""}</p>
+          ${sum}</div>`;
+      }
+    }
+    /* payment dispute panel */
+    let disputeHtml = "";
+    if(dispute){
+      const npc = DATA.npcs[dispute.employerNpcId]||{name:"The employer"};
+      disputeHtml = `<h2 class="warn">Payment problem</h2>
+      <div class="panel">
+        <p class="flavor">${esc(npc.name)} looks anywhere but at you. "About the ${dispute.promisedPayment} scrap. There's... a problem."</p>
+        <button data-act="disputeChoice" data-id="${dispute.id}" data-choice="lenient">Work with them<span class="sub">Take what they can pay now; carry the rest as a debt.</span></button>
+        <button data-act="disputeChoice" data-id="${dispute.id}" data-choice="threaten">Make the problem theirs<span class="sub">People remember money when they're frightened. People remember this, too.</span></button>
+        ${DIS.canKill(dispute)?`<button class="danger" data-act="disputeChoice" data-id="${dispute.id}" data-choice="kill">Kill and rob<span class="sub">Only what's physically there. Nothing ever again after.</span></button>`:""}
+        <button data-act="disputeChoice" data-id="${dispute.id}" data-choice="defer">Walk away — collect later<span class="sub">The debt stands. So does what tolerating this does to your name.</span></button>
+      </div>`;
+    }
+    /* active contract card OR daily offers */
+    let boardHtml = "";
+    if(active){
+      boardHtml = `<h2>Active contract</h2>
+      <button class="primary" data-act="go" data-to="contract">${esc(active.title)}
+        <span class="sub">${esc((DATA.npcs[active.employerNpcId]||{}).name||"")} · ${active.paymentRange[0]}–${active.paymentRange[1]} scrap · expires in ${Math.max(0, (active.expiryDays||3) - (G.world.day - G.jobs.active.dayAccepted))} day(s)</span>
+      </button>`;
+    } else {
+      boardHtml = `<h2>Today's contracts</h2>` + (offers.length ? offers.map(c=>{
+        const fam = J.offerFamiliar(c);
+        return `<button data-act="acceptContract" data-id="${c.id}">
+          ${esc(c.title)} — ${c.paymentRange[0]}–${c.paymentRange[1]} scrap
+          <span class="sub">${esc((DATA.npcs[c.employerNpcId]||{}).name||"")} · risk: ${c.risk} · takes the day</span>
+          ${fam?`<span class="sub" style="color:var(--amber)">THIS SOUNDS FAMILIAR</span>`:""}
+        </button>`;
+      }).join("") : `<div class="panel"><p class="dim">Nothing you qualify for today. The board refreshes tomorrow.</p></div>`);
+    }
+    /* standing quick jobs */
+    const standing = J.standingJobs().map(c=>{
+      if(c.family==="knowledge")
+        return `<button class="small" data-act="startQuiz" data-id="${c.id}">${esc(c.title)}<span class="sub">3 questions · up to 40 scrap · doesn't take the day</span></button>`;
+      return `<button class="small" data-act="startPest" data-id="${c.id}">${esc(c.title)}<span class="sub">reflexes · up to ${c.paymentRange[1]} scrap · doesn't take the day</span></button>`;
+    }).join("");
     app.appendChild(el(`<main>
       ${hero("jobs")}
       <h2>Job Board</h2>
-      <p class="flavor">Chalk on rusted steel. The good contracts ask for a rig and a death wish; the rest ask for your morning.</p>
-      ${rows}
-      <div class="panel"><p class="dim">Courier and combat contracts post when the road opens (Slice 3).</p></div>
+      <p class="flavor">Chalk on rusted steel. Real contracts now — pick where the day goes.</p>
+      ${outcomeHtml}
+      ${disputeHtml}
+      ${boardHtml}
+      ${standing?`<h2>Quick work</h2>${standing}`:""}
+      <h2>Emergency labor</h2>
+      <button data-act="labor" ${W.emergencyAvailable()?"":"disabled"}>
+        ${W.EMERGENCY_LABOR.name}${W.emergencyAvailable()?"":" — done for today"}
+        <span class="sub">${W.EMERGENCY_LABOR.flavor}</span>
+        <span class="sub">20–30 scrap · Mechanics helps · always here · takes the day</span>
+      </button>
       ${backBtn()}
+    </main>`));
+  },
+
+  contract(app){
+    const act = G.jobs.active;
+    if(!act){ setScreen("jobs"); return; }
+    const c = J.contractById(act.cid);
+    app.appendChild(headerBar());
+    const npc = DATA.npcs[c.employerNpcId]||{name:"?"};
+    const rumors = J.rumorsMatching(c.tags);
+    const rumorHtml = rumors.map(r=>rememberShown[r.id]
+      ? `<div class="panel"><p class="flavor">You remember something from ${esc(r.sourceDisplayName)}… "${esc(r.hintText)}"</p></div>`
+      : `<button class="small" data-act="remember" data-id="${r.id}">REMEMBER<span class="sub">Something you heard might apply here.</span></button>`
+    ).join("");
+    const approaches = (c.approaches||[]).map(a=>{
+      const avail = J.approachAvailable(c,a);
+      const p = a.noCheck ? null : J.approachChance(c,a);
+      const risk = a.noCheck ? "No going back" : J.riskWord(p);
+      return `<button data-act="approach" data-id="${a.id}" ${avail.ok?"":"disabled"}>
+        ${esc(a.label)} — ${risk}
+        <span class="sub">${esc(a.description)}</span>
+        <span class="sub">${a.skill?`uses ${a.skill}`:a.repStat?`uses ${a.repStat}`:"no check"}${a.resourceCost?` · costs ${a.resourceCost.scrap} scrap`:""}${avail.ok?"":" · "+avail.why}</span>
+      </button>`;
+    }).join("");
+    app.appendChild(el(`<main>
+      <h2>${esc(c.title)}</h2>
+      <p class="flavor">${esc(c.description)}</p>
+      <div class="panel" style="gap:4px">
+        <div class="kv"><span>Employer</span><b>${esc(npc.name)}</b></div>
+        <div class="kv"><span>Pays</span><b>${c.paymentRange[0]}–${c.paymentRange[1]} scrap</b></div>
+        <div class="kv"><span>Risk</span><b>${c.risk}</b></div>
+        <div class="kv"><span>Time</span><b>resolving takes the day</b></div>
+      </div>
+      ${rumorHtml}
+      <h2>How do you play it?</h2>
+      ${approaches}
+      <button class="danger small" data-act="abandonContract">Abandon the contract</button>
+      ${backBtn("jobs")}
+    </main>`));
+  },
+
+  quiz(app){
+    const cid = "c.mechquiz";
+    const c = J.contractById(cid);
+    const st = J.quizState(cid);
+    if(!c || !st || st.done){ setScreen("jobs"); return; }
+    app.appendChild(headerBar());
+    const q = c.questions[st.qi];
+    const canRemember = q.rumorHint && J.learnedRumor(q.rumorHint);
+    app.appendChild(el(`<main>
+      <h2>${esc(c.title)} — ${st.qi+1}/${c.questions.length}</h2>
+      <p class="flavor">${esc(c.description)}</p>
+      <div class="panel"><p>${esc(q.text)}</p></div>
+      ${canRemember ? (rememberShown[q.rumorHint]
+        ? `<div class="panel"><p class="flavor">You remember something from the Slag Bar… "${esc(J.rumorById(q.rumorHint).hintText)}"</p></div>`
+        : `<button class="small" data-act="remember" data-id="${q.rumorHint}">REMEMBER<span class="sub">Something you heard might apply here.</span></button>`) : ""}
+      ${q.options.map((o,i)=>`<button data-act="answerQuiz" data-cid="${cid}" data-i="${i}">${esc(o)}</button>`).join("")}
+      <p class="dim">${st.correct} right so far · 10 scrap each, +10 for a sweep</p>
+    </main>`));
+  },
+
+  pest(app){
+    const run = G.jobs.reflex.run;
+    if(!run){ setScreen("jobs"); return; }
+    const c = J.contractById(run.cid);
+    app.appendChild(headerBar());
+    if(run.done){
+      app.appendChild(el(`<main>
+        <h2>${esc(c.title)}</h2>
+        <div class="panel">
+          <p class="good"><b>${run.hits}/${c.reflex.targets}</b> pests down — ${Math.min(run.hits*c.reflex.payPerHit, c.paymentRange[1])} scrap.</p>
+          <p class="flavor">${run.hits>=c.reflex.targets?"Finch inspects the cage like a general inspecting a battlefield, and pays without haggling.":"The survivors will tell stories about you. Finch pays for the ones that won't."}</p>
+        </div>
+        <button class="primary" data-act="pestDone">Collect and go</button>
+      </main>`));
+      return;
+    }
+    const zones = c.reflex.zones;
+    app.appendChild(el(`<main>
+      <h2>${esc(c.title)} — ${run.shown}/${c.reflex.targets} · ${run.hits} down</h2>
+      <p class="flavor">Something moves. Hit the zone it's in before it vanishes.</p>
+      ${zones.map(z=>`<button class="pestzone ${run.zone===z?"active":""}" data-act="pestTap" data-zone="${z}">
+        ${run.zone===z?'<span class="pest">▲</span>':""}<span class="zlabel">${z.toUpperCase()}</span>
+      </button>`).join("")}
+      <p class="dim">10 scrap per pest · forgiving timer · tap the zone, not the pest</p>
     </main>`));
   },
 
@@ -562,6 +764,11 @@ export const SCREENS = {
 
   journal(app){
     app.appendChild(headerBar());
+    const rumorRows = G.rumors.slice().reverse().map(r=>`
+      <div class="panel" style="gap:2px">
+        <p style="font-size:15px">${esc(r.text)}</p>
+        <p class="dim" style="font-size:12px">${esc(r.sourceDisplayName)} · ${esc(r.location)} · Day ${r.dayHeard}</p>
+      </div>`).join("");
     const entries = G.journal.slice().reverse().map(e=>`
       <div class="panel" style="gap:2px">
         <p class="dim" style="font-size:12px">Day ${e.day}</p>
@@ -575,6 +782,8 @@ export const SCREENS = {
         <div class="kv"><span>Fame / Respect / Fear / Pop.</span><span>${G.rep.fame} / ${G.rep.respect} / ${G.rep.fear} / ${G.rep.popularity}</span></div>
         <div class="kv"><span>Lifetime scrap</span><span>${G.career.scrapEarned} earned · ${G.career.scrapSpent} spent</span></div>
       </div>
+      ${rumorRows?`<h2>Rumors — what you've heard</h2>${rumorRows}`:""}
+      <h2>The record</h2>
       ${entries}
       ${backBtn()}
     </main>`));
