@@ -1,8 +1,8 @@
 /* core.js — state container, seeded RNG, event bus, save/load/migrate.
    Owns G's identity and persistence. Knows nothing about game rules. */
 
-export const SAVE_VERSION = 4;
-export const BUILD = "0.4.0";
+export const SAVE_VERSION = 5;
+export const BUILD = "0.5.0-m3.1a";
 export const SAVE_KEY = "roadgrave.save";
 export const BACKUP_KEY = "roadgrave.save.backup";
 const SAVE_PREFIX = "RG1.";
@@ -55,11 +55,17 @@ export function newGame(){
                  crucible:0, civilians:0, gangs:0, raiders:0 } },
     career:{ wins:0, losses:0, streak:0, bestStreak:0,
       crucibleWins:0, crucibleLosses:0, championships:0,
-      contractsDone:0, contractsFailed:0,
+      contractsDone:0, contractsFailed:0, contractsExpired:0,
       scrapEarned:0, scrapSpent:0, salvageRecovered:0, distance:0,
       rescued:0, abandoned:0, killed:0, betrayals:0,
       promisesKept:0, promisesBroken:0,
       locationsDiscovered:[], settlementsVisited:["kettle_rock"], discoveries:[] },
+    /* v5: Job Board, rumors, disputes — see docs/ARCHITECTURE.md */
+    jobs:{ offersDay:0, offers:[], active:null, cooldowns:{}, resolutions:{},
+           history:[], emergencyDay:0, knowledge:{}, reflex:{ dayDone:0, run:null } },
+    rumors:[],
+    debts:[],
+    disputes:{},
     history:{},
     npcs:{},
     journal:[],
@@ -86,6 +92,10 @@ export function ensureDefaults(s){
   fill(s, fresh);
   if(!Array.isArray(s.journal)) s.journal = [];
   if(!Array.isArray(s.narrative.recent)) s.narrative.recent = [];
+  if(!Array.isArray(s.rumors)) s.rumors = [];
+  if(!Array.isArray(s.debts)) s.debts = [];
+  if(!Array.isArray(s.jobs.offers)) s.jobs.offers = [];
+  if(!Array.isArray(s.jobs.history)) s.jobs.history = [];
   s.vehicles.forEach(v=>{
     v.dmg = v.dmg || {hull:0,tires:0,plant:0};
     v.weapons.forEach(w=>{ if(w.dmgd===undefined) w.dmgd=false; });
@@ -159,6 +169,16 @@ const MIGRATIONS = {
     s.narrative = { recent:[] };
     s.inventory = s.inventory||[];
     s.vehicles.forEach(v=>{ v.id = v.id || ("v"+Math.floor(Math.random()*1e9)); });
+    s.saveVersion = 4;
+  },
+  4: s => {                                   // v4 -> v5: jobs, rumors, disputes
+    s.jobs = { offersDay:0, offers:[], active:null, cooldowns:{}, resolutions:{},
+               history:[], emergencyDay:0, knowledge:{}, reflex:{ dayDone:0, run:null } };
+    s.rumors = [];                            // structured rumor records
+    s.debts = [];                             // deferred payments owed to the player
+    s.disputes = {};                          // disputeId -> persisted truth/assets/resolution
+    s.career.contractsExpired = s.career.contractsExpired || 0;
+    s.saveVersion = 5;
   },
 };
 
