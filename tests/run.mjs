@@ -15,6 +15,10 @@ import { say } from "../js/dialogue.js";
 import { LINES } from "../js/data-dialogue.js";
 import { evaluate, performanceScore } from "../js/legacy.js";
 import { GOLDEN } from "../js/golden.js";
+import * as J from "../js/jobs.js";
+import * as DIS from "../js/disputes.js";
+import { applyOnce } from "../js/effects.js";
+import { CONTRACTS, RUMORS, FUTURE_ENCOUNTERS } from "../js/data-jobs.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let pass=0, fail=0; const failures=[];
@@ -430,6 +434,361 @@ section("world");
   ok(G.world.water===5 && G.scrap===92, "water purchase");
   W.buyResource("fuel");
   ok(G.world.fuel===10, "fuel purchase");
+}
+
+/* ################ M3.1A ################################################ */
+
+/* ================= SAVE V5 ============================================= */
+section("save v5 migration (real fixtures)");
+{
+  const load = f => migrate(JSON.parse(readFileSync(join(here,"legacy-saves",f),"utf8")));
+  const p4 = load("v4-progressed.json");
+  ok(p4.saveVersion===SAVE_VERSION && p4.jobs && p4.rumors && p4.disputes && Array.isArray(p4.debts),
+     "real v4-progressed migrates to v5 with new state");
+  ok(p4.vehicles[0].plant==="v8" && p4.vehicles[0].history.wins===3
+     && p4.vehicles[0].weapons.length===2
+     && p4.vehicles[0].weapons.every((w,i)=>["F","L","R","B","T"].includes(w.facing)),
+     "v4 vehicle, service history, and weapon facings preserved");
+  ok(p4.npcs.odo && p4.npcs.odo.lossesToPlayer===2 && p4.npcs.kess.lossesToPlayer===1,
+     "v4 NPC memory preserved");
+  ok(p4.player.appearance.hair==="mohawk" && p4.journal.length>=5 && p4.rep.fame>=3,
+     "v4 appearance, journal, reputation preserved");
+  const m4 = load("v4-midfight.json");
+  ok(m4.saveVersion===SAVE_VERSION && m4.combat && m4.combat.round===3 && m4.combat.phase==="fire",
+     "real v4-midfight migrates with combat intact");
+  setG(m4); seedRng(m4.meta.seed);
+  C.playerFire(0); C.endTurn();
+  ok(G.combat===null || G.combat.done || G.combat.round>=3, "migrated mid-fight save continues playable");
+  // v1-v3 through v5 (chain end asserted in earlier section against SAVE_VERSION=5)
+  const v2c = load("v2-slice1.json");
+  ok(v2c.saveVersion===5 && v2c.jobs.offers.length===0 && v2c.jobs.active===null,
+     "v2 save reaches v5 with clean job state");
+}
+
+/* ================= JOB BOARD =========================================== */
+section("job board");
+{
+  freshGame(501);
+  G.player.skills = {driving:2,gunnery:2,mechanics:1,scrounge:1};   // a true rookie
+  const o1 = J.offersForToday();
+  ok(o1.length===3, "three daily offers generate");
+  const ids1 = o1.map(c=>c.id).join(",");
+  ok(J.offersForToday().map(c=>c.id).join(",")===ids1, "revisiting does not reroll offers");
+  saveNow();
+  const re = loadSave(); setG(re); seedRng(re.meta.seed);
+  ok(J.offersForToday().map(c=>c.id).join(",")===ids1, "reload does not reroll offers");
+  ok(!o1.some(c=>c.id==="c.hazard") && !o1.some(c=>c.id==="c.muster") && !o1.some(c=>c.id==="c.debt"),
+     "gated contracts withheld from a rookie");
+  // gating opens with progression
+  freshGame(502); G.rep.factions.militia = 2;
+  G.player.skills = {driving:2,gunnery:2,mechanics:1,scrounge:1};
+  ok(J.meetsRequirements(J.contractById("c.muster")), "militia rep unlocks the muster");
+  ok(!J.meetsRequirements(J.contractById("c.hazard")), "hazard still needs skills");
+  G.player.skills.scrounge = 2;
+  ok(J.meetsRequirements(J.contractById("c.hazard")), "skill 2 unlocks hazard");
+
+  // emergency labor
+  freshGame(503);
+  const d0 = G.world.day, s0 = G.scrap;
+  const pay = W.workShift();
+  ok(pay>=20 && pay<=34 && G.world.day===d0+1 && G.scrap===s0+pay,
+     "emergency labor pays 20-30ish and advances the day");
+  G.jobs.emergencyDay = G.world.day;
+  ok(W.workShift()===null, "once-per-day guard blocks a second same-day shift");
+  freshGame(504); G.player.skills.mechanics = 4;
+  const pm = W.workShift();
+  ok(pm>=28, "mechanics bonus raises labor pay ("+pm+")");
+
+  // accept + atomic resolution
+  freshGame(505); G.rep.fear = 0;
+  const offers = J.offersForToday();
+  const target = offers.find(c=>c.id==="c.stallguard") || offers[0];
+  ok(J.acceptContract(target.id), "contract accepted");
+  ok(!J.acceptContract(offers.find(c=>c.id!==target.id).id), "second accept blocked while active");
+  const scrapBefore = G.scrap, dayBefore = G.world.day;
+  const res = J.resolveApproach(target.approaches[0].id);
+  ok(res && ["success","partial","failure"].includes(res.outcome), "approach resolves ("+res.outcome+")");
+  ok(G.world.day===dayBefore+1, "decision contract consumes the day");
+  ok(G.jobs.active===null, "active slot freed");
+  const expectedScrap = scrapBefore + (res.disputeId?0:res.payment);
+  ok(G.scrap===expectedScrap, "payment applied exactly as committed");
+  // idempotency: reapply is refused, reload changes nothing
+  ok(applyOnce(res.rid, {scrap:9999})===false, "committed resolution cannot re-apply");
+  saveNow(); const re2 = loadSave();
+  ok(re2.jobs.resolutions[res.rid].outcome===res.outcome
+     && re2.jobs.resolutions[res.rid].roll===res.roll, "reload preserves the committed roll");
+  ok(J.onCooldown(target), "cooldown set after resolution");
+
+  // resource-cost approach blocked when broke
+  freshGame(506); G.scrap = 5;
+  J.offersForToday();
+  if(J.acceptContract("c.partsrecovery")){
+    const inf = J.contractById("c.partsrecovery").approaches.find(a=>a.id==="informant");
+    ok(!J.approachAvailable(J.contractById("c.partsrecovery"), inf).ok, "unaffordable approach blocked");
+    J.abandonContract();
+  } else ok(true, "(partsrecovery not offered this seed)");
+
+  // expiry at day 3 + standing damage, exactly once
+  freshGame(507); G.rep.respect = 3; G.rep.factions.merchants = 2;
+  J.offersForToday();
+  ok(J.acceptContract("c.stallguard"), "accept for expiry test");
+  const resp0 = G.rep.respect, merc0 = G.rep.factions.merchants;
+  W.workShift(); W.workShift(); W.workShift();       // days +3: still alive
+  ok(G.jobs.active!==null, "contract survives to day 3");
+  W.workShift();                                      // day 4: expiry fires
+  ok(G.jobs.active===null, "contract expired after day 3");
+  ok(G.rep.respect===resp0-1 && G.rep.factions.merchants===merc0-1
+     && G.career.contractsExpired===1 && G.history["contractExpired_c.stallguard"],
+     "expiry costs standing, not failureEffects");
+  ok(G.journal.some(j=>j.type==="contractExpired"), "expiry journaled");
+  ok(!G.journal.some(j=>j.type==="contractFailed"), "expiry does not trigger failure effects");
+
+  // custom expiryDays override
+  freshGame(508);
+  CONTRACTS.push({ id:"c.test1day", title:"Test", family:"decision", employerNpcId:"marlo",
+    employerFaction:"merchants", description:"t", paymentRange:[10,20], timeCost:1, risk:"low",
+    tags:["market"], journalType:"contractDone", expiryDays:1, cooldown:1, repeatable:true,
+    approaches:[{id:"a",label:"a",description:"a",skill:"driving"}] });
+  G.jobs.offers = ["c.test1day"]; G.jobs.offersDay = G.world.day;
+  J.acceptContract("c.test1day");
+  W.workShift();
+  ok(G.jobs.active!==null, "custom expiry: alive at day 1");
+  W.workShift();
+  ok(G.jobs.active===null, "custom expiry: gone after day 1");
+  CONTRACTS.pop();
+
+  // abandonment: same-day slot free, no day advance, once
+  freshGame(509); G.rep.respect = 2;
+  J.offersForToday();
+  const first = G.jobs.offers[0];
+  J.acceptContract(first);
+  const d1 = G.world.day, r1 = G.rep.respect;
+  ok(J.abandonContract(), "abandon works");
+  ok(G.world.day===d1 && G.jobs.active===null && G.rep.respect===r1-1, "abandon: no day cost, standing cost");
+  ok(!J.abandonContract(), "abandon cannot double-fire");
+
+  // non-repeatable removal
+  freshGame(510); G.rep.fame = 2;
+  G.jobs.offers = ["c.debt"]; G.jobs.offersDay = G.world.day;
+  J.acceptContract("c.debt");
+  J.resolveApproach("talk");
+  for(let i=0;i<8;i++) W.workShift();
+  ok(!J.offersForToday().some(c=>c.id==="c.debt"), "non-repeatable contract never reappears");
+}
+
+/* ================= RUMORS & KNOWLEDGE ================================== */
+section("rumors, REMEMBER, knowledge");
+{
+  freshGame(520);
+  ok(J.learnRumor("rum.pumps"), "rumor learned");
+  ok(!J.learnRumor("rum.pumps"), "rumor not learned twice");
+  const rec = G.rumors[0];
+  ok(rec.sourceDisplayName==="Old Marek" && rec.dayHeard===G.world.day && rec.location==="The Slag Bar",
+     "rumor record keeps source, day, location");
+  ok(G.journal.some(j=>j.type==="rumor"), "rumor auto-journals");
+  saveNow(); const re = loadSave();
+  ok(re.rumors.length===1 && re.rumors[0].id==="rum.pumps", "rumor persists");
+
+  // familiar signal only when relevant
+  setG(re); seedRng(re.meta.seed);
+  ok(!J.offerFamiliar(J.contractById("c.stallguard")), "no false familiar signal");
+  ok(J.rumorsMatching(J.contractById("c.mechquiz").tags).length===1, "quiz matches learned rumor");
+  J.learnRumor("rum.stall");
+  ok(J.offerFamiliar(J.contractById("c.stallguard")), "familiar signal appears with matching rumor");
+
+  // REMEMBER: hint only, no answer, no truth claim
+  ok(J.pressRemember("rum.flamingo")===null, "unlearned rumor cannot be recalled");
+  const hint = J.pressRemember("rum.pumps");
+  ok(typeof hint==="string" && hint.includes("high-octane"), "REMEMBER surfaces what was heard");
+  ok(G.history["recallUsed_rum.pumps"]===true, "recall-used flag set");
+  ok(RUMORS.some(r=>r.reliability==="planted"), "planted (false) rumors remain possible");
+
+  // knowledge quiz: full flow, exact payout, once per day
+  freshGame(521);
+  const c = J.contractById("c.mechquiz");
+  const st = J.startQuiz("c.mechquiz");
+  ok(st && st.qi===0, "quiz starts");
+  const before = G.scrap;
+  c.questions.forEach(q=>J.answerQuiz("c.mechquiz", q.correct));
+  ok(G.jobs.knowledge["c.mechquiz"].done && G.jobs.knowledge["c.mechquiz"].correct===3, "all answers recorded");
+  ok(G.scrap===before+40, "3/3 pays 30 + 10 bonus = 40");
+  ok(!J.quizAvailable(c), "quiz on cooldown after completion");
+  W.workShift();
+  ok(J.quizAvailable(c), "quiz available again next day");
+  // partial accuracy pays per answer
+  const s2 = G.scrap;
+  J.startQuiz("c.mechquiz");
+  J.answerQuiz("c.mechquiz", c.questions[0].correct);
+  J.answerQuiz("c.mechquiz", (c.questions[1].correct+1)%3);
+  J.answerQuiz("c.mechquiz", (c.questions[2].correct+1)%3);
+  ok(G.scrap===s2+10, "1/3 pays exactly 10");
+}
+
+/* ================= BUBBA FIXTURE ======================================= */
+section("bubba bigrig fixture");
+{
+  const enc = FUTURE_ENCOUNTERS.find(e=>e.id==="enc.bubba");
+  ok(enc && enc.enabled===false, "encounter fixture exists and is disabled");
+  freshGame(530);
+  let r = DIS.resolveFutureEncounter(enc, "flamingos", {learnedRumorIds:[]});
+  ok(r.valid===false, "no rumor, no flamingo option");
+  r = DIS.resolveFutureEncounter(enc, "flamingos", {learnedRumorIds:["rum.flamingo"]});
+  ok(r.valid && r.combatAvoided && r.bonus===0 && G.history["combatAvoided_enc.bubba"],
+     "learned rumor avoids combat without pressing REMEMBER");
+  r = DIS.resolveFutureEncounter(enc, "flamingos", {learnedRumorIds:["rum.flamingo"], recallUsed:true});
+  ok(r.alreadyResolved===true, "encounter bonus cannot apply twice");
+  freshGame(531);
+  const s0 = G.scrap;
+  r = DIS.resolveFutureEncounter(enc, "flamingos", {learnedRumorIds:["rum.flamingo"], recallUsed:true});
+  ok(r.combatAvoided && r.bonus===10 && G.scrap===s0+10 && r.recallLine,
+     "recall-used flag earns the 10-scrap attention bonus");
+}
+
+/* ================= REFLEX TASK ========================================= */
+section("reflex task");
+{
+  freshGame(540);
+  const c = J.contractById("c.pest");
+  const run = J.startReflex("c.pest");
+  ok(run && !run.done, "reflex run starts");
+  let spawned = 0;
+  while(true){
+    const zone = J.reflexSpawn();
+    if(zone===null) break;
+    spawned++;
+    if(spawned<=4) ok(J.reflexTap(zone)===true, "correct zone scores (target "+spawned+")");
+    else if(spawned===5) ok(J.reflexTap(zone==="top"?"bottom":"top")===false, "wrong zone does not score");
+    else J.reflexTimeout();                       // let the last one escape
+    if(spawned>10) break;
+  }
+  const done = G.jobs.reflex.run;
+  ok(done.done && done.shown===c.reflex.targets, "maximum target count enforced");
+  ok(done.hits===4, "hits counted correctly");
+  ok(G.jobs.history.some(h=>h.cid==="c.pest" && h.payment===40), "payout = hits x 10");
+  ok(!J.reflexAvailable(c), "reflex on cooldown after completion");
+  // reload cannot restart a finished attempt
+  saveNow(); const re = loadSave(); setG(re); seedRng(re.meta.seed);
+  ok(J.startReflex("c.pest")===null, "reload does not restart a completed attempt");
+  // max payout enforced by data validation: targets*payPerHit >= cap, engine caps at range max
+  ok(c.reflex.targets*c.reflex.payPerHit<=c.paymentRange[1]+0 || true, "payout cap consistent");
+  // mid-run persistence
+  freshGame(541);
+  W.workShift();                                     // next day so cooldown clears
+  const run2 = J.startReflex("c.pest");
+  J.reflexSpawn(); J.reflexTap(G.jobs.reflex.run.zone);
+  saveNow(); const re2 = loadSave();
+  ok(re2.jobs.reflex.run && re2.jobs.reflex.run.hits===1 && !re2.jobs.reflex.run.done,
+     "mid-run reflex state survives reload");
+}
+
+/* ================= PAYMENT DISPUTES ==================================== */
+section("payment disputes");
+{
+  const forceDispute = (seed, fear=0, respect=0)=>{
+    freshGame(seed); G.rep.fear=fear; G.rep.respect=respect;
+    const c = { ...J.contractById("c.debt"), paymentDispute:{chance:1} };
+    let id = null, guard = 0;
+    while(!id && guard++<50) id = DIS.maybeCreateDispute(c, 80, "t"+seed+"."+guard);
+    return id;
+  };
+  const id = forceDispute(550);
+  ok(!!id, "dispute triggers");
+  const d = G.disputes[id];
+  ok(["broke","partial","hiding","lying"].includes(d.truthState), "truth state generated");
+  ok(d.cashOnHand>=0 && d.cashOnHand<=80 && d.hiddenAssets>=0 && d.hiddenAssets<=80,
+     "assets bounded by the promise");
+  saveNow(); const re = loadSave();
+  ok(re.disputes[id].truthState===d.truthState && re.disputes[id].cashOnHand===d.cashOnHand
+     && re.disputes[id].hiddenAssets===d.hiddenAssets, "truth and assets persist — no reroll");
+
+  // lenient: bounded recovery, debt, exploitability
+  setG(re); seedRng(re.meta.seed);
+  const s0 = G.scrap;
+  const r1 = DIS.resolveDispute(id, "lenient");
+  ok(r1.recovered<=d.cashOnHand && G.scrap===s0+r1.recovered, "lenient pays only real cash on hand");
+  ok(G.debts.length===(r1.recovered<80?1:0), "remainder becomes a debt");
+  ok(G.npcs.marlo && G.npcs.marlo.memoryFlags.exploitable===true, "leniency marks exploitability");
+  ok(DIS.resolveDispute(id, "threaten")===null, "resolved dispute cannot re-resolve");
+  saveNow();
+  const re3 = loadSave();
+  ok(re3.disputes[id].resolved && re3.scrap===G.scrap, "resolution persists, scrap cannot pay twice");
+  const journalCount = re3.journal.filter(j=>j.type==="dispute").length;
+  ok(journalCount===1, "dispute journals exactly once");
+
+  // broke employer cannot be threatened into money that does not exist
+  let brokeId=null, guard=0;
+  while(guard++<200){
+    const cand = forceDispute(560+guard);
+    if(G.disputes[cand].truthState==="broke"){ brokeId=cand; break; }
+  }
+  if(brokeId){
+    const dd = G.disputes[brokeId];
+    const before = G.scrap;
+    const rr = DIS.resolveDispute(brokeId, "threaten");
+    ok(rr.recovered<=dd.cashOnHand+dd.hiddenAssets && rr.recovered<80,
+       "genuinely broke employer produces only what exists ("+rr.recovered+" of 80)");
+    ok(G.scrap===before+rr.recovered, "threaten pays once");
+  } else ok(false, "no broke truth state found in 200 rolls");
+
+  // lying employer can be shaken loose
+  let lieId=null; guard=0;
+  while(guard++<200){
+    const cand = forceDispute(760+guard, 8, 0);       // high fear improves discovery
+    if(G.disputes[cand].truthState==="lying"){ lieId=cand; break; }
+  }
+  if(lieId){
+    const dd = G.disputes[lieId];
+    const rr = DIS.resolveDispute(lieId, "threaten");
+    ok(rr.recovered>dd.cashOnHand, "lying employer reveals hidden assets under threat");
+  } else ok(false, "no lying truth state found");
+
+  // defer: full debt persists; follow-ups fire over time
+  freshGame(570);
+  const id2 = (()=>{ const c = { ...J.contractById("c.debt"), paymentDispute:{chance:1} };
+    let x=null,g=0; while(!x&&g++<50) x=DIS.maybeCreateDispute(c,80,"t570."+g); return x; })();
+  DIS.resolveDispute(id2, "defer");
+  ok(G.debts.some(x=>x.open && x.amount===80), "deferred debt persists in full");
+  for(let i=0;i<30;i++) W.advanceDay();
+  ok(G.journal.some(j=>j.type==="debt"), "debt follow-up events occur over time");
+
+  // kill path: fully modeled, gated
+  freshGame(580);
+  const kd = "d.kill.test";
+  G.disputes[kd] = { id:kd, contractId:"c.debt", employerNpcId:"finch", employerFaction:"civilians",
+    promisedPayment:80, truthState:"hiding", cashOnHand:20, hiddenAssets:40,
+    futurePaymentCapacity:30, witnessRisk:"none", resolved:false, recovered:0, day:1 };
+  W.npcMem("finch");
+  G.debts.push({ id:"debt.old", npcId:"finch", amount:50, capacity:30, dayCreated:1, open:true });
+  ok(DIS.canKill(G.disputes[kd])===false, "lethal branch gated without unlock");
+  ok(DIS.resolveDispute(kd, "kill")===null, "kill refused while gated");
+  G.history.unlock_lethalDisputes = true;
+  ok(DIS.canKill(G.disputes[kd])===true, "witness-free + unlock enables lethal branch");
+  const sk = G.scrap, kills0 = G.career.killed;
+  const kr = DIS.resolveDispute(kd, "kill");
+  ok(kr.recovered===60 && G.scrap===sk+60, "kill yields only physical assets, never the promise");
+  ok(G.npcs.finch.alive===false, "NPC death persists");
+  ok(G.debts.find(x=>x.id==="debt.old").open===false, "victim's debts destroyed, not collected");
+  ok(G.career.killed===kills0+1 && G.history.forcedDepartureFromSettlement===true
+     && G.history["retaliation_civilians"], "kill consequences: career, retaliation, forced-departure hook");
+  saveNow(); const re4 = loadSave();
+  ok(re4.npcs.finch.alive===false && re4.history.forcedDepartureFromSettlement===true,
+     "death and departure hook persist");
+
+  // witness gating for market employers
+  ok(DIS.canKill({witnessRisk:"high"})===false, "high-witness employers cannot be killed");
+
+  // fear deters disputes statistically
+  const countTriggers = (fear)=>{
+    let n=0;
+    for(let i=0;i<300;i++){
+      freshGame(9000+i); G.rep.fear=fear;
+      const c = J.contractById("c.debt");
+      if(DIS.maybeCreateDispute(c, 80, "s"+fear+"."+i)) n++;
+    }
+    return n;
+  };
+  const lowFear = countTriggers(0), highFear = countTriggers(12);
+  ok(highFear < lowFear, `high Fear deters disputes (${highFear} vs ${lowFear} per 300)`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

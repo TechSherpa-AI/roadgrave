@@ -53,6 +53,9 @@ export function resolveDispute(id, choice){
   const d = G.disputes[id];
   if(!d || d.resolved) return null;
   const npc = DATA.npcs[d.employerNpcId] || {name:d.employerNpcId};
+  if(!G.npcs[d.employerNpcId])
+    G.npcs[d.employerNpcId] = { encounterCount:0, lossesToPlayer:0, winsVsPlayer:0,
+      relationship:0, disposition:"neutral", alive:true, memoryFlags:{} };
   const mem = G.npcs[d.employerNpcId];
   let recovered = 0, fx = {}, text = "";
 

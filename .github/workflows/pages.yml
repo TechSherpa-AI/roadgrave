@@ -26,6 +26,8 @@ jobs:
         run: node tests/validate-content.mjs
       - name: Regression suite
         run: node tests/run.mjs
+      - name: Economy simulations (exploit/dominance checks)
+        run: node tests/simulate-economy.mjs
       - name: Install Playwright
         run: npm i playwright --no-save && npx playwright install --with-deps chromium
       - name: Browser smoke test (core player path)
