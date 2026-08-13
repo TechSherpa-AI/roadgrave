@@ -2,7 +2,7 @@
    structured history flags, reputation, NPC memory, the journal, world
    resources/day, and scrap movement (earn/spend tracking). */
 
-import { G, save, logMsg, ri, rand } from "./core.js";
+import { G, save, logMsg, ri, rand, bus } from "./core.js";
 import { DATA, byId } from "./data.js";
 import { say } from "./dialogue.js";
 
@@ -74,25 +74,34 @@ export function addJournal(type, data={}){
     if(G.journal.length>500) G.journal.shift();
   }catch(e){ console.error("journal entry failed:", type, e); }
 }
+bus.on("journal", (type, data)=>addJournal(type, data));   // effects.js routes here
+
+/* ---- the day: ONE place advances it ----------------------------------- */
+export function advanceDay(){
+  G.world.day++;
+  bus.emit("dayAdvanced", G.world.day);
+}
 
 /* ---- vehicle history hooks (vehicles own their object; we increment) -- */
 export function vhist(v){ return v.history; }
 
-/* ---- day-advancing town work ------------------------------------------ */
-export function workShift(id){
-  const job = byId(DATA.shifts, id);
-  if(!job) return null;
-  const bonus = G.player.skills[job.skill]*5;
-  let payout = job.base + bonus + ri(-job.var, job.var);
-  G.world.day++;
-  let extra = "";
-  if(rand() < 0.1){
-    const found = ri(8,20);
-    payout += found;
-    extra = ` A loose panel hides ${found} scrap someone never came back for.`;
-  }
-  earn(payout, "shift");
-  logMsg(`Day ${G.world.day-1}: ${job.name}. Paid ${payout} scrap.${extra}`);
+/* ---- emergency labor ---------------------------------------------------
+   The floor under the economy: always available, once per day, modest pay,
+   guaranteed to advance the day (which refreshes Job Board offers).
+   Deliberately inferior to successful contracts. */
+export const EMERGENCY_LABOR = {
+  id:"wrench", name:"Emergency wrench shift", base:20, var:10,
+  flavor:"Elbow-deep in someone else's bad decisions. The garage always needs hands.",
+};
+export function emergencyAvailable(){ return G.jobs.emergencyDay !== G.world.day; }
+export function workShift(){
+  if(!emergencyAvailable()) return null;
+  const bonus = G.player.skills.mechanics*2;
+  const payout = EMERGENCY_LABOR.base + bonus + ri(0, EMERGENCY_LABOR.var);
+  G.jobs.emergencyDay = G.world.day;
+  earn(payout, "labor");
+  logMsg(`Day ${G.world.day}: ${EMERGENCY_LABOR.name}. Paid ${payout} scrap.`);
+  advanceDay();
   maybeTownEvent();
   save();
   return payout;

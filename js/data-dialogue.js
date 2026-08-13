@@ -122,7 +122,7 @@ export const LINES = [
 { id:"town.rec3", ctx:"townEvent", minTier:2, once:"townFanSpouse", effects:{rep:{popularity:1}}, text:"A fan plants themselves in your path, beaming, and gestures at their startled spouse. \"Kiss 'em! One kiss! It's our anniversary!\"" },
 { id:"town.rec4", ctx:"townEvent", minTier:3, text:"Someone's chalked your rig — recognizably YOUR rig — on the water-tower. The militia hasn't scrubbed it off. That's a statement." },
 // business
-{ id:"town.biz1", ctx:"townEvent", minTier:2, text:"A merchant flags you down. \"Loved that last Crucible run. Five caps off your first purchase... next year.\"" },
+{ id:"town.biz1", ctx:"townEvent", minTier:2, text:"A merchant flags you down. \"Loved that last Crucible run. Five scrap off your first purchase... next year.\"" },
 { id:"town.biz2", ctx:"townEvent", minTier:3, text:"A parts dealer offers to name a sale after you. \"The Champion's Clearance. You get nothing, of course. But it's an honor.\"" },
 // mockery
 { id:"town.mock1", ctx:"townEvent", maxTier:0, text:"A gate guard squints at your rig, then at you. \"Towing fees are up front, friend.\"" },
