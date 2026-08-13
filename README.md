@@ -4,40 +4,36 @@ A lightweight car-combat RPG for iPhone Safari, in the systems-first spirit of
 mid-1980s RPGs: text and numbers lead, graphics are minimal. Original setting,
 factions, and story.
 
-**The entire game is one file: [`index.html`](index.html).** No build step, no
-dependencies, no network calls. All state persists in `localStorage`, with
-export/import save strings as a backup.
-
-## Play it on an iPhone
-
 **Play here: https://techsherpa-ai.github.io/roadgrave/** (auto-deployed from
-`main` on every push).
+`main` after the regression suite passes).
 
 1. Open the link in Safari on the iPhone.
 2. Tap **Share → Add to Home Screen**. Launch from the home-screen icon for
    full-screen portrait play.
 
 Autosave is always on. Use **Settings & Saves → Export** to back up your game
-as a text string; paste it back to restore on any device.
+as a text string; paste it back to restore on any device. Saves migrate
+forward automatically across versions.
 
-## Backdrop art (optional)
+## Code layout
 
-Screens look for JPEGs in `img/` and silently skip any that are missing:
-`title.jpg`, `city.jpg`, `garage.jpg`, `market.jpg`, `jobs.jpg`, `bar.jpg`,
-`arena.jpg`. Drop files with those names into the folder and every screen
-gets its backdrop — no code changes needed.
+No build step — plain ES modules under `js/`, static tables split from
+logic, dialogue in its own content file. Read `docs/ARCHITECTURE.md` first.
+Art slots and request templates: `docs/ASSET_REQUIREMENTS.md`.
 
-## Development
+- Tests: `node tests/run.mjs` (also gates every deploy in CI)
+- Golden save fixtures: `tests/golden/` — regenerate with `node tests/make-golden.mjs`
+- Debug panel: open the game with `?dev=1`, then Settings → Developer
 
-Built in vertical slices, each independently playable. The changelog and known
-gaps live in the `NOTES` comment block at the top of `index.html`.
+## Milestones
 
-| Slice | Content | Status |
+| # | Content | Status |
 |---|---|---|
 | 0 | Scaffold: UI shell, state machine, saves, export/import | ✅ |
 | 1 | Driver creation, workshop, garage/economy | ✅ |
-| 2 | Arena tactical combat | ✅ |
-| 3 | Overland map, one city, scavenging | — |
+| 2 | Arena tactical combat + narrative pass + rig schematic | ✅ |
+| M3 | Architecture: modules, save v4, world state, reputation, NPC memory, data-driven dialogue, crowd tiers, appearance, journal, vehicle history, legacy, map navigation, tests | ✅ |
+| 3 | Overland map, travel, encounters, scavenging | — |
 | 4 | Crew and convoy | — |
 | 5 | Campaign spine and progression | — |
 | 6 | Balance and polish | — |

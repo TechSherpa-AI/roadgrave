@@ -1,0 +1,231 @@
+{
+ "saveVersion": 4,
+ "meta": {
+  "build": "0.4.0",
+  "ironman": false,
+  "seed": 12345,
+  "rngCalls": 0
+ },
+ "screen": "fight",
+ "player": {
+  "created": true,
+  "name": "Paused",
+  "skills": {
+   "driving": 2,
+   "gunnery": 3,
+   "mechanics": 2,
+   "scrounge": 1
+  },
+  "xp": 0,
+  "injuries": [],
+  "appearance": {
+   "body": "androgynous",
+   "build": "muscular",
+   "hair": "mohawk",
+   "face": "damaged",
+   "clothing": "leathers",
+   "accessory": "goggles"
+  }
+ },
+ "scrap": 300,
+ "inventory": [],
+ "vehicles": [
+  {
+   "id": "v465034822",
+   "name": "The Test Mule",
+   "chassis": "courser",
+   "plant": "v8",
+   "armor": {
+    "F": 4,
+    "L": 2,
+    "R": 2,
+    "B": 2,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "mg",
+     "facing": "F",
+     "ammo": 20,
+     "dmgd": false
+    },
+    {
+     "id": "cannon",
+     "facing": "F",
+     "ammo": 8,
+     "dmgd": false
+    }
+   ],
+   "gear": [],
+   "cargo": [],
+   "dmg": {
+    "hull": 0,
+    "tires": 0,
+    "plant": 0
+   },
+   "history": {
+    "originalChassis": "courser",
+    "acquiredDay": 1,
+    "previousOwners": [],
+    "mileage": 0,
+    "wins": 0,
+    "losses": 0,
+    "kills": 0,
+    "majorRepairs": 0,
+    "installs": 0,
+    "removals": 0,
+    "championships": 0
+   }
+  }
+ ],
+ "activeVehicle": 0,
+ "crew": [],
+ "world": {
+  "location": "kettle_rock",
+  "day": 1,
+  "fuel": 0,
+  "water": 0,
+  "food": 0,
+  "ammoReserve": 0
+ },
+ "rep": {
+  "fame": 0,
+  "respect": 0,
+  "fear": 0,
+  "popularity": 0,
+  "factions": {
+   "militia": 0,
+   "merchants": 0,
+   "mechanics": 0,
+   "scavengers": 0,
+   "crucible": 0,
+   "civilians": 0,
+   "gangs": 0,
+   "raiders": 0
+  }
+ },
+ "career": {
+  "wins": 0,
+  "losses": 0,
+  "streak": 0,
+  "bestStreak": 0,
+  "crucibleWins": 0,
+  "crucibleLosses": 0,
+  "championships": 0,
+  "contractsDone": 0,
+  "contractsFailed": 0,
+  "scrapEarned": 0,
+  "scrapSpent": 0,
+  "salvageRecovered": 0,
+  "distance": 0,
+  "rescued": 0,
+  "abandoned": 0,
+  "killed": 0,
+  "betrayals": 0,
+  "promisesKept": 0,
+  "promisesBroken": 0,
+  "locationsDiscovered": [],
+  "settlementsVisited": [
+   "kettle_rock"
+  ],
+  "discoveries": []
+ },
+ "history": {},
+ "npcs": {
+  "odo": {
+   "encounterCount": 1,
+   "lossesToPlayer": 0,
+   "winsVsPlayer": 0,
+   "relationship": 0,
+   "disposition": "neutral",
+   "alive": true,
+   "memoryFlags": {}
+  }
+ },
+ "journal": [],
+ "narrative": {
+  "recent": []
+ },
+ "campaign": {
+  "beatsDone": [],
+  "flags": {
+   "started": true
+  }
+ },
+ "combat": {
+  "tier": "q",
+  "npc": "odo",
+  "round": 3,
+  "phase": "fire",
+  "done": false,
+  "result": null,
+  "applied": false,
+  "called": null,
+  "enemyFirst": false,
+  "rams": 0,
+  "p": {
+   "pos": 4,
+   "lane": 1,
+   "speed": 2,
+   "heat": 6,
+   "drvPen": 0
+  },
+  "e": {
+   "pos": 6,
+   "lane": 1,
+   "speed": 1,
+   "heat": 4,
+   "drvPen": 0
+  },
+  "foe": {
+   "id": "odo",
+   "name": "Pipsqueak Odo",
+   "skills": {
+    "driving": 1,
+    "gunnery": 1
+   }
+  },
+  "foeV": {
+   "chassis": "skiff",
+   "plant": "junker",
+   "armor": {
+    "F": 1,
+    "L": 1,
+    "R": 1,
+    "B": 0,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "scatter",
+     "facing": "F",
+     "ammo": 6,
+     "dmgd": false
+    }
+   ],
+   "gear": [],
+   "dmg": {
+    "hull": 2,
+    "tires": 1,
+    "plant": 0
+   },
+   "history": {
+    "originalChassis": "skiff",
+    "acquiredDay": 1,
+    "previousOwners": [],
+    "mileage": 9,
+    "wins": 0,
+    "losses": 0,
+    "kills": 0,
+    "majorRepairs": 0,
+    "installs": 0,
+    "removals": 0,
+    "championships": 0
+   }
+  },
+  "log": [
+   "Round 3: you have the initiative."
+  ]
+ },
+ "log": []
+}
