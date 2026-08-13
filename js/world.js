@@ -108,16 +108,13 @@ export function buyResource(kind){
   return true;
 }
 
-/* ---- ambient town events ---------------------------------------------- */
+/* ---- ambient town events ----------------------------------------------
+   Consequences are declared on the dialogue entries themselves (`effects`)
+   and applied by the dialogue engine — never inferred from wording here. */
 export function maybeTownEvent(chance=0.35, ctx="townEvent"){
   if(rand() > chance) return null;
   const line = say(ctx);
-  if(line){
-    logMsg(line);
-    if(ctx==="townEvent" && /shake my hand|one of OURS|autograph/i.test(line)) bumpRep("popularity", 1);
-    // the bar admirer two-parter: seeing part 1 unlocks part 2
-    if(line.includes("keeps looking at you")) setFlag("barAdmirerSeen");
-  }
+  if(line) logMsg(line);
   return line;
 }
 

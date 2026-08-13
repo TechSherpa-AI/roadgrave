@@ -22,8 +22,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Content schema validation
+        run: node tests/validate-content.mjs
       - name: Regression suite
         run: node tests/run.mjs
+      - name: Install Playwright
+        run: npm i playwright --no-save && npx playwright install --with-deps chromium
+      - name: Browser smoke test (core player path)
+        run: node tests/smoke.mjs
 
   deploy:
     needs: test

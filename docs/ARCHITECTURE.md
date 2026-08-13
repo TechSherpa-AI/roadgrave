@@ -174,7 +174,16 @@ Dialogue engine: `say(context, {speaker, extra})` filters
 tags, fame tier bounds, player win-streak, rival loss count, appearance
 tags, required/excluded history flags), weights the survivors, avoids
 the last ~24 used ids, and returns rendered text. Bad entries are
-skipped, never thrown.
+skipped, never thrown. Consequences are DECLARED on entries via an
+`effects` field (rep deltas, faction deltas, set/inc history flags,
+npc relationship) and applied by the engine when a line fires — game
+code never infers effects from line wording. `tests/validate-content.mjs`
+schema-checks every entry (and archetypes, cross-references, fixtures)
+in CI.
+
+Character appearance status: the 6×3 schema, creation UI, persistence,
+and dialogue hooks are complete; **no visual compositing is implemented**
+— layer art and the compositor are future work (see ASSET_REQUIREMENTS).
 
 Journal: `world.addJournal(type, data)` stores structured data AND
 rendered prose (template per type). Future prose improvements re-render

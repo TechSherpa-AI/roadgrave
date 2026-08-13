@@ -1,0 +1,47 @@
+{
+ "meta": {
+  "version": 1,
+  "build": "0.1.0",
+  "ironman": false,
+  "seed": 1443911294,
+  "rngCalls": 0
+ },
+ "screen": "hub",
+ "driver": {
+  "name": "Nameless",
+  "skills": {
+   "driving": 0,
+   "gunnery": 0,
+   "mechanics": 0,
+   "scrounge": 0
+  },
+  "xp": 0,
+  "injuries": []
+ },
+ "scrap": 0,
+ "inventory": [],
+ "vehicles": [],
+ "crew": [],
+ "world": {
+  "location": "kettle_rock",
+  "day": 1,
+  "fuel": 0,
+  "supplies": 0,
+  "factionRep": {
+   "combine": 0,
+   "gangs": 0,
+   "zealots": 0,
+   "militias": 0
+  }
+ },
+ "campaign": {
+  "beatsDone": [],
+  "flags": {
+   "started": true
+  }
+ },
+ "combat": null,
+ "log": [
+  "You wake in Kettle Rock with empty pockets and a driver nerve."
+ ]
+}

@@ -52,6 +52,33 @@ function eligible(e, ctx, opts){
   return true;
 }
 
+/* Declared consequences: entries carry an `effects` object instead of the
+   engine inferring anything from wording.
+     effects: { rep:{fame:1,...}, factions:{militia:1,...},
+                setFlags:["key"], incFlags:{key:1},
+                npcRelationship: 1 }        // applies to opts.speaker
+   Unknown effect keys are ignored with a warning — bad content never throws. */
+function applyEffects(e, opts){
+  const fx = e.effects;
+  if(!fx) return;
+  try{
+    if(fx.rep) for(const k of Object.keys(fx.rep)){
+      if(G.rep[k]!==undefined && typeof fx.rep[k]==="number") G.rep[k] = Math.max(0, G.rep[k]+fx.rep[k]);
+      else console.warn("dialogue effect: unknown rep key", k, "in", e.id);
+    }
+    if(fx.factions) for(const k of Object.keys(fx.factions)){
+      G.rep.factions[k] = (G.rep.factions[k]||0) + fx.factions[k];
+    }
+    if(fx.setFlags) fx.setFlags.forEach(f=>{ G.history[f] = true; });
+    if(fx.incFlags) for(const k of Object.keys(fx.incFlags)){
+      G.history[k] = (G.history[k]||0) + fx.incFlags[k];
+    }
+    if(fx.npcRelationship && opts.speaker && G.npcs[opts.speaker]){
+      G.npcs[opts.speaker].relationship += fx.npcRelationship;
+    }
+  }catch(err){ console.warn("dialogue effects failed for", e.id, err); }
+}
+
 /* Pick a line for a context. opts: {speaker} */
 export function say(ctx, opts={}){
   let pool = [];
@@ -78,5 +105,6 @@ export function say(ctx, opts={}){
     if(opts.speaker && G.npcs[opts.speaker]) G.npcs[opts.speaker].memoryFlags[chosen.once] = true;
     else if(!opts.speaker) G.history["once_"+chosen.once] = true;
   }
+  applyEffects(chosen, opts);
   return chosen.text;
 }

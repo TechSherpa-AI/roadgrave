@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "version": 2,
+  "build": "0.2.0",
+  "ironman": false,
+  "seed": 7,
+  "rngCalls": 9
+ },
+ "screen": "hub",
+ "driver": {
+  "created": true,
+  "name": "Ada",
+  "skills": {
+   "driving": 2,
+   "gunnery": 2,
+   "mechanics": 3,
+   "scrounge": 1
+  },
+  "xp": 0,
+  "injuries": []
+ },
+ "scrap": 8,
+ "inventory": [],
+ "vehicles": [
+  {
+   "name": "The Vulture",
+   "chassis": "skiff",
+   "plant": "junker",
+   "armor": {
+    "F": 2,
+    "L": 0,
+    "R": 0,
+    "B": 0,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "scatter",
+     "facing": "F",
+     "ammo": 10
+    }
+   ],
+   "gear": [],
+   "cargo": []
+  }
+ ],
+ "crew": [],
+ "world": {
+  "location": "kettle_rock",
+  "day": 4,
+  "fuel": 0,
+  "supplies": 0,
+  "factionRep": {
+   "combine": 0,
+   "gangs": 0,
+   "zealots": 0,
+   "militias": 0
+  }
+ },
+ "campaign": {
+  "beatsDone": [],
+  "flags": {
+   "started": true
+  }
+ },
+ "combat": null,
+ "log": [
+  "Ada signs the refinery's severance ledger: 100 scrap and a handshake.",
+  "The Crucible posts open qualifiers. The garage smells like opportunity.",
+  "Day 1: Wrench shift at the garage. Paid 75 scrap. A loose panel hides 20 scrap someone never came back for.",
+  "Day 2: Wall guard rotation. Paid 56 scrap.",
+  "Day 3: Salvage sorting. Paid 38 scrap.",
+  "Bought a Salt Skiff. The yard hands you the keys and a shrug. She's yours: The Vulture.",
+  "Slag Bar: \"Crucible champion two seasons back? Drives courier now. Says the road pays better than glory.\""
+ ]
+}

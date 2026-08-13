@@ -44,7 +44,16 @@ no other code changes. The map layer supports future overlays (posters,
 champion markings, faction banners) as additional absolutely-positioned
 elements; request that art only when the feature lands.
 
-## Character creation layers — the 18-asset spec (NOT yet needed to play)
+## Character creation layers — the 18-asset spec
+
+**STATUS: FOUNDATION COMPLETE — NOT VISUALLY IMPLEMENTED.**
+What exists today: the 6×3 appearance schema, creation UI, save
+persistence, and dialogue conditions that query appearance tags.
+What does NOT exist: any in-game rendering of character art. No layer
+compositing code has been written and no layer assets exist; nothing in
+the game currently draws the character. The spec below is the production
+target for when that work is scheduled — building the compositor is its
+own future task, to be planned when the first test layers arrive.
 
 Appearance is 6 categories × 3 choices assembled from aligned transparent
 layers. When we produce these, every file must share ONE canvas and

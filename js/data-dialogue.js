@@ -15,6 +15,11 @@
      requiredFlags / excludedFlags   [keys] in G.history
      once          memory-flag key: fires at most once per NPC (or globally if no speaker)
      weight        selection weight (default 1)
+     effects       declared consequences applied when the line fires:
+                   { rep:{popularity:1}, factions:{militia:1},
+                     setFlags:["key"], incFlags:{key:1}, npcRelationship:1 }
+                   Consequences live HERE, on the entry — game code never
+                   infers effects from line wording.
 */
 export const LINES = [
 
@@ -112,9 +117,9 @@ export const LINES = [
 
 /* ================= TOWN AMBIENT EVENTS ================================ */
 // recognition / praise
-{ id:"town.rec1", ctx:"townEvent", minTier:1, text:"A dock worker double-takes at you. \"You're the one from the Crucible. Knew it. Shake my hand — nobody'll believe me otherwise.\"" },
+{ id:"town.rec1", ctx:"townEvent", minTier:1, effects:{rep:{popularity:1}}, text:"A dock worker double-takes at you. \"You're the one from the Crucible. Knew it. Shake my hand — nobody'll believe me otherwise.\"" },
 { id:"town.rec2", ctx:"townEvent", minTier:2, text:"Two kids run past re-enacting your last bout. The one playing you refuses to trade roles." },
-{ id:"town.rec3", ctx:"townEvent", minTier:2, once:"townFanSpouse", text:"A fan plants themselves in your path, beaming, and gestures at their startled spouse. \"Kiss 'em! One kiss! It's our anniversary!\"" },
+{ id:"town.rec3", ctx:"townEvent", minTier:2, once:"townFanSpouse", effects:{rep:{popularity:1}}, text:"A fan plants themselves in your path, beaming, and gestures at their startled spouse. \"Kiss 'em! One kiss! It's our anniversary!\"" },
 { id:"town.rec4", ctx:"townEvent", minTier:3, text:"Someone's chalked your rig — recognizably YOUR rig — on the water-tower. The militia hasn't scrubbed it off. That's a statement." },
 // business
 { id:"town.biz1", ctx:"townEvent", minTier:2, text:"A merchant flags you down. \"Loved that last Crucible run. Five caps off your first purchase... next year.\"" },
@@ -126,14 +131,14 @@ export const LINES = [
 { id:"town.fear1", ctx:"townEvent", minFear:3, text:"A conversation dies as you pass. Every eye finds somewhere else to be. The silence follows you a full block." },
 { id:"town.fear2", ctx:"townEvent", minFear:5, text:"A merchant refuses your scrap. \"On the house. Please.\" It isn't generosity. It's insurance." },
 // begging / comedy
-{ id:"town.beg1", ctx:"townEvent", minTier:2, text:"A man with an engine block in a wheelbarrow begs you to autograph it. It's not even a make you've driven." },
+{ id:"town.beg1", ctx:"townEvent", minTier:2, effects:{rep:{popularity:1}}, text:"A man with an engine block in a wheelbarrow begs you to autograph it. It's not even a make you've driven." },
 { id:"town.com1", ctx:"townEvent", text:"Somebody's goat is loose in the scrap lanes again. The militia sergeant chasing it pretends not to see you seeing him." },
 { id:"town.com2", ctx:"townEvent", text:"A street preacher of the Last Green blesses your tires — \"the meek shall inherit the road\" — then asks for a lift nowhere in particular." },
 // recruitment tease (companions later)
 { id:"town.rct1", ctx:"townEvent", minTier:2, text:"A mechanic with grease to the elbows watches you pass. \"Whoever tunes your rig is wasting your money,\" they call. \"Just saying.\"" },
 
 /* ================= SLAG BAR ============================================ */
-{ id:"bar.look1", ctx:"barEvent", minTier:2, once:"barAdmirer", text:"Someone across the room keeps looking at you. Not hostile. The other thing." },
+{ id:"bar.look1", ctx:"barEvent", minTier:2, once:"barAdmirer", effects:{setFlags:["barAdmirerSeen"]}, text:"Someone across the room keeps looking at you. Not hostile. The other thing." },
 { id:"bar.look2", ctx:"barEvent", minTier:2, requiredFlags:["barAdmirerSeen"], text:"The one who kept looking finally walks over. \"I saw you crushing cars in the Crucible. Want to find somewhere quieter?\"" },
 { id:"bar.tale1", ctx:"barEvent", minTier:3, text:"Someone at the rail is telling your qualifier story to a stranger. The story has grown a second rocket pod and a heroic fire." },
 { id:"bar.tale2", ctx:"barEvent", maxTier:1, text:"The bar talk is all Bruna. Three seasons. Nobody's betting against her — yet." },

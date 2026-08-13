@@ -14,6 +14,9 @@ import { render, SCREENS } from "./ui.js";
   if(loaded){ setG(loaded); reseedRng(); }
   else { const g = newGame(); setG(g); seedRng(g.meta.seed); g.screen = "title"; }
 
+  // live state handle for the browser smoke test / console debugging
+  window.__RG_STATE = () => JSON.parse(JSON.stringify(G));
+
   if(!SCREENS[G.screen]) G.screen = "title";
   if(G.screen==="fight" && !G.combat) G.screen = "arena";
   if(G.campaign.flags.dead) G.screen = "legacy";

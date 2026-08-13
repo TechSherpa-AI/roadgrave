@@ -1,0 +1,93 @@
+{
+ "meta": {
+  "version": 3,
+  "build": "0.3.2",
+  "ironman": false,
+  "seed": 11,
+  "rngCalls": 94
+ },
+ "screen": "hub",
+ "driver": {
+  "created": true,
+  "name": "Ada",
+  "skills": {
+   "driving": 2,
+   "gunnery": 3,
+   "mechanics": 2,
+   "scrounge": 1
+  },
+  "xp": 2,
+  "injuries": []
+ },
+ "scrap": 190,
+ "inventory": [],
+ "vehicles": [
+  {
+   "name": "The Widow",
+   "chassis": "courser",
+   "plant": "v8",
+   "armor": {
+    "F": 3,
+    "L": 1,
+    "R": 1,
+    "B": 0,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "mg",
+     "facing": "F",
+     "ammo": 20,
+     "dmgd": false
+    },
+    {
+     "id": "cannon",
+     "facing": "F",
+     "ammo": 8,
+     "dmgd": false
+    }
+   ],
+   "gear": [],
+   "cargo": [],
+   "dmg": {
+    "hull": 0,
+    "tires": 0,
+    "plant": 0
+   }
+  }
+ ],
+ "crew": [],
+ "world": {
+  "location": "kettle_rock",
+  "day": 1,
+  "fuel": 0,
+  "supplies": 0,
+  "factionRep": {
+   "combine": 0,
+   "gangs": 0,
+   "zealots": 0,
+   "militias": 2
+  }
+ },
+ "campaign": {
+  "beatsDone": [],
+  "flags": {
+   "started": true,
+   "arena": {
+    "q": 2,
+    "p": 0,
+    "t": 0
+   }
+  }
+ },
+ "combat": null,
+ "log": [
+  "Ada signs the refinery's severance ledger: 100 scrap and a handshake.",
+  "The Crucible posts open qualifiers. The garage smells like opportunity.",
+  "Bought a Courser. The yard hands you the keys and a shrug. She's yours: The Widow.",
+  "Crucible: beat Pipsqueak Odo. Purse 120 + 15 salvage scrap.",
+  "Crucible: beat Pipsqueak Odo. Purse 60 + 14 salvage scrap.",
+  "Crucible: lost to Kess the Vulture. Towed out 72 scrap lighter.",
+  "The wrench crew hammers your rig back into shape."
+ ]
+}
