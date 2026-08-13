@@ -1,0 +1,247 @@
+{
+ "saveVersion": 4,
+ "meta": {
+  "build": "0.4.0",
+  "ironman": false,
+  "seed": 2024,
+  "rngCalls": 92
+ },
+ "screen": "hub",
+ "player": {
+  "created": true,
+  "name": "Ricketts",
+  "skills": {
+   "driving": 2,
+   "gunnery": 3,
+   "mechanics": 2,
+   "scrounge": 1
+  },
+  "xp": 4,
+  "injuries": [],
+  "appearance": {
+   "body": "androgynous",
+   "build": "muscular",
+   "hair": "mohawk",
+   "face": "damaged",
+   "clothing": "leathers",
+   "accessory": "gunbelt"
+  }
+ },
+ "scrap": 547,
+ "inventory": [],
+ "vehicles": [
+  {
+   "id": "v690795754",
+   "name": "The Brick",
+   "chassis": "courser",
+   "plant": "v8",
+   "armor": {
+    "F": 3,
+    "L": 1,
+    "R": 1,
+    "B": 1,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "mg",
+     "facing": "F",
+     "ammo": 20,
+     "dmgd": false
+    },
+    {
+     "id": "cannon",
+     "facing": "F",
+     "ammo": 8,
+     "dmgd": false
+    }
+   ],
+   "gear": [],
+   "cargo": [],
+   "dmg": {
+    "hull": 0,
+    "tires": 0,
+    "plant": 0
+   },
+   "history": {
+    "originalChassis": "courser",
+    "acquiredDay": 4,
+    "previousOwners": [],
+    "mileage": 15,
+    "wins": 3,
+    "losses": 0,
+    "kills": 3,
+    "majorRepairs": 0,
+    "installs": 9,
+    "removals": 0,
+    "championships": 0
+   }
+  }
+ ],
+ "activeVehicle": 0,
+ "crew": [],
+ "world": {
+  "location": "kettle_rock",
+  "day": 4,
+  "fuel": 10,
+  "water": 5,
+  "food": 0,
+  "ammoReserve": 0
+ },
+ "rep": {
+  "fame": 3,
+  "respect": 3,
+  "fear": 1,
+  "popularity": 2,
+  "factions": {
+   "militia": 3,
+   "merchants": 0,
+   "mechanics": 0,
+   "scavengers": 0,
+   "crucible": 3,
+   "civilians": 0,
+   "gangs": 0,
+   "raiders": 0
+  }
+ },
+ "career": {
+  "wins": 3,
+  "losses": 0,
+  "streak": 3,
+  "bestStreak": 3,
+  "crucibleWins": 3,
+  "crucibleLosses": 0,
+  "championships": 0,
+  "contractsDone": 0,
+  "contractsFailed": 0,
+  "scrapEarned": 734,
+  "scrapSpent": 787,
+  "salvageRecovered": 39,
+  "distance": 0,
+  "rescued": 0,
+  "abandoned": 0,
+  "killed": 0,
+  "betrayals": 0,
+  "promisesKept": 0,
+  "promisesBroken": 0,
+  "locationsDiscovered": [],
+  "settlementsVisited": [
+   "kettle_rock"
+  ],
+  "discoveries": []
+ },
+ "history": {
+  "defeatedOdo": 2,
+  "defeatedKess": 1
+ },
+ "npcs": {
+  "odo": {
+   "encounterCount": 2,
+   "lossesToPlayer": 2,
+   "winsVsPlayer": 0,
+   "relationship": 0,
+   "disposition": "personal",
+   "alive": true,
+   "memoryFlags": {}
+  },
+  "kess": {
+   "encounterCount": 1,
+   "lossesToPlayer": 1,
+   "winsVsPlayer": 0,
+   "relationship": 0,
+   "disposition": "irritated",
+   "alive": true,
+   "memoryFlags": {}
+  }
+ },
+ "journal": [
+  {
+   "day": 1,
+   "type": "created",
+   "data": {
+    "name": "Ricketts"
+   },
+   "text": "Ricketts signed the refinery's severance ledger and walked into Kettle Rock with 100 scrap and a driver's nerve."
+  },
+  {
+   "day": 4,
+   "type": "firstVehicle",
+   "data": {
+    "chassisName": "Courser",
+    "vname": "The Brick"
+   },
+   "text": "Bought a Courser off the yard and named her The Brick. Broke, armed with a shrug — but rolling."
+  },
+  {
+   "day": 4,
+   "type": "boutWin",
+   "data": {
+    "foe": "Pipsqueak Odo",
+    "tierName": "Qualifier — Blood & Gravel",
+    "purse": 120,
+    "streak": 1
+   },
+   "text": "Beat Pipsqueak Odo in the Crucible (Qualifier — Blood & Gravel). Purse: 120 scrap. Streak: 1."
+  },
+  {
+   "day": 4,
+   "type": "boutWin",
+   "data": {
+    "foe": "Pipsqueak Odo",
+    "tierName": "Qualifier — Blood & Gravel",
+    "purse": 60,
+    "streak": 2
+   },
+   "text": "Beat Pipsqueak Odo in the Crucible (Qualifier — Blood & Gravel). Purse: 60 scrap. Streak: 2."
+  },
+  {
+   "day": 4,
+   "type": "boutWin",
+   "data": {
+    "foe": "Kess the Vulture",
+    "tierName": "Purse Bout — The Grinder",
+    "purse": 250,
+    "streak": 3
+   },
+   "text": "Beat Kess the Vulture in the Crucible (Purse Bout — The Grinder). Purse: 250 scrap. Streak: 3."
+  }
+ ],
+ "narrative": {
+  "recent": [
+   "rum4",
+   "ent.u2",
+   "odo.p1",
+   "odo.p2",
+   "odo.p2",
+   "cw.u1",
+   "odo.b2",
+   "ent.u1",
+   "odo.p1",
+   "amb.u2",
+   "odo.p1",
+   "odo.p1",
+   "cw.e1",
+   "odo.b2",
+   "ent.e2",
+   "cw.e1",
+   "kess.b2"
+  ]
+ },
+ "campaign": {
+  "beatsDone": [],
+  "flags": {
+   "started": true
+  }
+ },
+ "combat": null,
+ "log": [
+  "Day 1: Wrench shift at the garage. Paid 67 scrap.",
+  "Day 2: Wall guard rotation. Paid 61 scrap.",
+  "Day 3: Salvage sorting. Paid 37 scrap.",
+  "Bought a Courser. The yard hands you the keys and a shrug. She's yours: The Brick.",
+  "Slag Bar: \"Crucible champion two seasons back? Drives courier now. Says the road pays better than glory.\"",
+  "Crucible: beat Pipsqueak Odo. Purse 120 + 13 salvage scrap.",
+  "Crucible: beat Pipsqueak Odo. Purse 60 + 15 salvage scrap.",
+  "Crucible: beat Kess the Vulture. Purse 250 + 11 salvage scrap."
+ ]
+}

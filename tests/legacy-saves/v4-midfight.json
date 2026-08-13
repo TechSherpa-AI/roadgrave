@@ -1,0 +1,264 @@
+{
+ "saveVersion": 4,
+ "meta": {
+  "build": "0.4.0",
+  "ironman": false,
+  "seed": 3033,
+  "rngCalls": 26
+ },
+ "screen": "fight",
+ "player": {
+  "created": true,
+  "name": "Ricketts",
+  "skills": {
+   "driving": 2,
+   "gunnery": 3,
+   "mechanics": 2,
+   "scrounge": 1
+  },
+  "xp": 0,
+  "injuries": [],
+  "appearance": {
+   "body": "androgynous",
+   "build": "muscular",
+   "hair": "mohawk",
+   "face": "damaged",
+   "clothing": "leathers",
+   "accessory": "gunbelt"
+  }
+ },
+ "scrap": 1,
+ "inventory": [],
+ "vehicles": [
+  {
+   "id": "v998805983",
+   "name": "The Vulture",
+   "chassis": "courser",
+   "plant": "v8",
+   "armor": {
+    "F": 3,
+    "L": 1,
+    "R": 1,
+    "B": 1,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "mg",
+     "facing": "T",
+     "ammo": 19,
+     "dmgd": false
+    },
+    {
+     "id": "cannon",
+     "facing": "F",
+     "ammo": 8,
+     "dmgd": false
+    }
+   ],
+   "gear": [
+    {
+     "id": "ring",
+     "charges": null
+    }
+   ],
+   "cargo": [],
+   "dmg": {
+    "hull": 0,
+    "tires": 0,
+    "plant": 0
+   },
+   "history": {
+    "originalChassis": "courser",
+    "acquiredDay": 4,
+    "previousOwners": [],
+    "mileage": 8,
+    "wins": 0,
+    "losses": 0,
+    "kills": 0,
+    "majorRepairs": 0,
+    "installs": 10,
+    "removals": 0,
+    "championships": 0
+   }
+  }
+ ],
+ "activeVehicle": 0,
+ "crew": [],
+ "world": {
+  "location": "kettle_rock",
+  "day": 4,
+  "fuel": 0,
+  "water": 0,
+  "food": 0,
+  "ammoReserve": 0
+ },
+ "rep": {
+  "fame": 0,
+  "respect": 0,
+  "fear": 0,
+  "popularity": 0,
+  "factions": {
+   "militia": 0,
+   "merchants": 0,
+   "mechanics": 0,
+   "scavengers": 0,
+   "crucible": 0,
+   "civilians": 0,
+   "gangs": 0,
+   "raiders": 0
+  }
+ },
+ "career": {
+  "wins": 0,
+  "losses": 0,
+  "streak": 0,
+  "bestStreak": 0,
+  "crucibleWins": 0,
+  "crucibleLosses": 0,
+  "championships": 0,
+  "contractsDone": 0,
+  "contractsFailed": 0,
+  "scrapEarned": 274,
+  "scrapSpent": 873,
+  "salvageRecovered": 0,
+  "distance": 0,
+  "rescued": 0,
+  "abandoned": 0,
+  "killed": 0,
+  "betrayals": 0,
+  "promisesKept": 0,
+  "promisesBroken": 0,
+  "locationsDiscovered": [],
+  "settlementsVisited": [
+   "kettle_rock"
+  ],
+  "discoveries": []
+ },
+ "history": {},
+ "npcs": {
+  "odo": {
+   "encounterCount": 1,
+   "lossesToPlayer": 0,
+   "winsVsPlayer": 0,
+   "relationship": 0,
+   "disposition": "neutral",
+   "alive": true,
+   "memoryFlags": {}
+  }
+ },
+ "journal": [
+  {
+   "day": 1,
+   "type": "created",
+   "data": {
+    "name": "Ricketts"
+   },
+   "text": "Ricketts signed the refinery's severance ledger and walked into Kettle Rock with 100 scrap and a driver's nerve."
+  },
+  {
+   "day": 4,
+   "type": "firstVehicle",
+   "data": {
+    "chassisName": "Courser",
+    "vname": "The Vulture"
+   },
+   "text": "Bought a Courser off the yard and named her The Vulture. Broke, armed with a shrug — but rolling."
+  }
+ ],
+ "narrative": {
+  "recent": [
+   "town.com1",
+   "town.mock1",
+   "rum6",
+   "ent.u1",
+   "odo.p1",
+   "amb.u3"
+  ]
+ },
+ "campaign": {
+  "beatsDone": [],
+  "flags": {
+   "started": true
+  }
+ },
+ "combat": {
+  "tier": "q",
+  "npc": "odo",
+  "round": 3,
+  "phase": "fire",
+  "done": false,
+  "result": null,
+  "applied": false,
+  "called": null,
+  "enemyFirst": true,
+  "rams": 0,
+  "p": {
+   "pos": 8,
+   "lane": 1,
+   "speed": 3,
+   "heat": 6,
+   "drvPen": 0
+  },
+  "e": {
+   "pos": 1,
+   "lane": 1,
+   "speed": 3,
+   "heat": 4,
+   "drvPen": 0
+  },
+  "foe": {
+   "id": "odo",
+   "name": "Pipsqueak Odo",
+   "skills": {
+    "driving": 1,
+    "gunnery": 1
+   }
+  },
+  "foeV": {
+   "chassis": "skiff",
+   "plant": "junker",
+   "armor": {
+    "F": 2,
+    "L": 1,
+    "R": 1,
+    "B": 0,
+    "T": 0
+   },
+   "weapons": [
+    {
+     "id": "scatter",
+     "facing": "F",
+     "ammo": 10
+    }
+   ],
+   "gear": [],
+   "dmg": {
+    "hull": 0,
+    "tires": 1,
+    "plant": 0
+   }
+  },
+  "log": [
+   "The holding pen smells of coolant and fear. Beyond the gate: a bowl of packed slag and chain-link, and ten thousand people who paid to watch steel die.",
+   "Pipsqueak Odo revs a patched Salt Skiff two stalls down. He doesn't look at you — rookies never do. \"Nothing personal,\" he mutters to his wheel. \"I just gotta eat.\"",
+   "The pit master drops his arm.",
+   "Nobody chants for you. Somebody near the gate is taking bets on how long you last — the long odds are unkind.",
+   "Round 1: you have the initiative.",
+   "The Vulture's Slugthrower hits — 6 through the B — a tire is shredded!",
+   "Odo's voice cracks over the din: \"Okay. Okay okay okay—\"",
+   "Round 2: Pipsqueak Odo has the jump.",
+   "\"Fresh meat's still rolling!\" someone shouts, halfway between mockery and surprise.",
+   "Round 3: Pipsqueak Odo has the jump."
+  ]
+ },
+ "log": [
+  "Day 1: Wrench shift at the garage. Paid 66 scrap.",
+  "Somebody's goat is loose in the scrap lanes again. The militia sergeant chasing it pretends not to see you seeing him.",
+  "Day 2: Wall guard rotation. Paid 58 scrap.",
+  "Day 3: Salvage sorting. Paid 50 scrap.",
+  "A gate guard squints at your rig, then at you. \"Towing fees are up front, friend.\"",
+  "Bought a Courser. The yard hands you the keys and a shrug. She's yours: The Vulture.",
+  "Slag Bar: \"They say the Collection's flagship is a refinery on treads. They say you hear it before the horizon shows it.\""
+ ]
+}
