@@ -63,7 +63,7 @@ export const CONTRACTS = [
   employerNpcId:"marlo", employerFaction:"merchants",
   description:"A wax-sealed crate, an address on the far side of the coker stacks, and Marlo's only instruction: it arrives unopened, today, and nobody official sees it move.",
   paymentRange:[60,90], timeCost:1, risk:"medium", cooldown:3, repeatable:true,
-  tags:["contraband","delivery","gangs"], paymentDispute:{chance:0.25}, journalType:"contractDone",
+  tags:["contraband","delivery","gangs"], paymentDispute:{chance:0.22}, journalType:"contractDone",
   approaches:[
     { id:"discreet", label:"Move it quiet", skill:"scrounge", mod:5,
       description:"Back lanes, tarp over the crate, patience at every checkpoint." },
@@ -116,7 +116,7 @@ export const CONTRACTS = [
   description:"Finch owes Marlo for two seasons of stall credit and has stopped answering his door. Marlo wants the debt collected — method negotiable, results not.",
   paymentRange:[60,90], timeCost:1, risk:"medium", cooldown:5, repeatable:false,
   requirements:{ rep:{fame:1} },
-  tags:["debt","collection"], paymentDispute:{chance:0.35}, journalType:"contractDone",
+  tags:["debt","collection"], paymentDispute:{chance:0.25}, journalType:"contractDone",
   approaches:[
     { id:"leanon", label:"Lean on him", skill:null, repStat:"fear", mod:5,
       description:"Fear opens doors that knocking doesn't.",

@@ -684,8 +684,24 @@ section("reflex task");
 /* ================= PAYMENT DISPUTES ==================================== */
 section("payment disputes");
 {
+  // ---- two-completed-contract gate (rookie shield) ----------------------
+  {
+    freshGame(590);
+    const gc = { ...J.contractById("c.debt"), paymentDispute:{chance:1} };
+    let hits = 0;
+    for(let i=0;i<50;i++) if(DIS.maybeCreateDispute(gc, 80, "g0."+i)) hits++;
+    ok(hits===0, "no dispute with 0 completed contracts, even at chance 1");
+    G.career.contractsDone = 1; G.career.contractsFailed = 5;
+    for(let i=0;i<50;i++) if(DIS.maybeCreateDispute(gc, 80, "g1."+i)) hits++;
+    ok(hits===0, "1 completed contract still gated — failed contracts do not count");
+    G.career.contractsDone = 2;
+    ok(!!DIS.maybeCreateDispute(gc, 80, "g2.0"),
+       "gate opens at exactly 2 completed contracts (roll-time count = third completion)");
+  }
+
   const forceDispute = (seed, fear=0, respect=0)=>{
     freshGame(seed); G.rep.fear=fear; G.rep.respect=respect;
+    G.career.contractsDone = 2;                    // past the rookie-shield gate
     const c = { ...J.contractById("c.debt"), paymentDispute:{chance:1} };
     let id = null, guard = 0;
     while(!id && guard++<50) id = DIS.maybeCreateDispute(c, 80, "t"+seed+"."+guard);
@@ -743,7 +759,7 @@ section("payment disputes");
   } else ok(false, "no lying truth state found");
 
   // defer: full debt persists; follow-ups fire over time
-  freshGame(570);
+  freshGame(570); G.career.contractsDone = 2;      // past the rookie-shield gate
   const id2 = (()=>{ const c = { ...J.contractById("c.debt"), paymentDispute:{chance:1} };
     let x=null,g=0; while(!x&&g++<50) x=DIS.maybeCreateDispute(c,80,"t570."+g); return x; })();
   DIS.resolveDispute(id2, "defer");
@@ -782,6 +798,7 @@ section("payment disputes");
     let n=0;
     for(let i=0;i<300;i++){
       freshGame(9000+i); G.rep.fear=fear;
+      G.career.contractsDone = 2;                  // past the rookie-shield gate
       const c = J.contractById("c.debt");
       if(DIS.maybeCreateDispute(c, 80, "s"+fear+"."+i)) n++;
     }

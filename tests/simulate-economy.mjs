@@ -86,6 +86,7 @@ function simDisputes(fear, respect){
   while(triggers < N/10){                          // 1k resolutions per choice per profile
     attempts++;
     profile({driving:2,gunnery:2,mechanics:1,scrounge:1}, {fear, respect});
+    G.career.contractsDone = 2;                    // past the rookie-shield gate
     seedRng((attempts*2654435761)>>>0);
     const c = J.contractById("c.debt");
     const id = DIS.maybeCreateDispute(c, 80, "sim"+attempts);
@@ -114,6 +115,40 @@ for(const [label, fear, respect] of [["low F/R",0,0],["mid F/R",5,5],["high F/R"
     violations.push(label+": lenient recovers more cash than threaten (unexpected direction)");
 }
 console.log("truth-state frequency:", Object.entries(truthCount).map(([k,v])=>`${k} ${fmt(v*100/Object.values(truthCount).reduce((a,b)=>a+b,0))}%`).join(", "));
+
+/* ---- rookie dispute rate at the gate boundary --------------------------
+   Disputes cannot fire until 2 contracts are completed, so the rookie rate
+   is measured at the FIRST ELIGIBLE contract: the third completion, with
+   contractsDone = 2 at roll time, for a low Fear/Respect player. Reported
+   per dispute-capable contract and as the even-mix aggregate; the aggregate
+   must land in the approved 15-20% band. */
+console.log("\n=== ROOKIE DISPUTE RATE (first eligible contract = 3rd completion; low F/R; 10k per contract) ===");
+{
+  profile({driving:2,gunnery:2,mechanics:1,scrounge:1});
+  let preGate = 0;
+  for(let i=0;i<N;i++){ seedRng((i*40503+11)>>>0);
+    if(DIS.maybeCreateDispute(J.contractById("c.debt"), 80, "pre"+i)) preGate++; }
+  console.log(`before 2 completed contracts: ${preGate} triggers in ${N} attempts (gate)`);
+  if(preGate>0) violations.push("dispute fired before the 2-completed-contract gate");
+
+  const rates = [];
+  for(const cid of ["c.stallguard","c.partsrecovery","c.package","c.debt"]){
+    let n=0;
+    for(let i=0;i<N;i++){
+      profile({driving:2,gunnery:2,mechanics:1,scrounge:1}, {fear:0, respect:0});
+      G.career.contractsDone = 2;
+      seedRng((i*2246822519+7)>>>0);
+      if(DIS.maybeCreateDispute(J.contractById(cid), 80, "rk."+cid+"."+i)) n++;
+    }
+    rates.push(n/N);
+    console.log(`  ${cid}: ${fmt(n/N*100)}%`);
+  }
+  const rookie = rates.reduce((a,b)=>a+b,0)/rates.length;
+  const preFame = rates.slice(0,3).reduce((a,b)=>a+b,0)/3;   // c.debt needs fame 1
+  console.log(`rookie rate — even mix of dispute-capable contracts: ${fmt(rookie*100)}% | before fame 1 (Finch's Ledger locked): ${fmt(preFame*100)}%`);
+  if(rookie < 0.15 || rookie > 0.20)
+    violations.push(`rookie dispute rate ${fmt(rookie*100)}% outside the approved 15-20% band`);
+}
 // dominance sanity: threaten wins cash but costs popularity/relationship and
 // invites retaliation; lenient/defer build debt+loyalty. Cash-only dominance
 // is expected for threaten — verify NON-cash penalty exists in engine:

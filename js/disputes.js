@@ -13,6 +13,11 @@ const span = ([lo,hi]) => lo + rand()*(hi-lo);
 /* Trigger roll. High Fear/Respect deter cheating; a rep for tolerating
    non-payment (NPC memory) invites it. Returns disputeId or null. */
 export function maybeCreateDispute(contract, promised, rid){
+  // Rookie shield (approved 2026-08-14): disputes cannot fire until the
+  // player has completed at least 2 contracts. Counted at roll time, before
+  // this resolution's own career increment, so the first eligible contract
+  // is the third completion.
+  if((G.career.contractsDone||0) < 2) return null;
   let chance = contract.paymentDispute.chance;
   chance *= Math.max(0.4, 1 - (G.rep.fear||0)*0.04);
   chance *= Math.max(0.5, 1 - (G.rep.respect||0)*0.03);
