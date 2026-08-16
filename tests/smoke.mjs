@@ -45,6 +45,18 @@ const has = sel => page.$(sel).then(x=>!!x);
 const state = () => page.evaluate(()=>window.__RG_STATE());
 const noHScroll = async label => ok(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth+1), "no horizontal scroll: "+label);
 const shot = async name => { if(shots) await page.screenshot({path:join(shots,name+".png")}); };
+const expectExit = async label => ok(await has('button.exit[data-act="go"][data-to="hub"]'), "Main Street exit: "+label);
+const scrollY = () => page.evaluate(()=>window.scrollY);
+/* appearance groups: 6 categories × 3 chips, no chip orphaned flush-left
+   under the next category label (wrapped chips indent past the label) */
+const appearanceGrouped = (pg=page) => pg.evaluate(()=>{
+  const rows = [...document.querySelectorAll(".approw")];
+  return rows.length===6 && rows.every(r=>{
+    const lbl = r.querySelector(".applbl").getBoundingClientRect();
+    const chips = [...r.querySelectorAll(".appopts .chip")];
+    return chips.length===3 && chips.every(c=>c.getBoundingClientRect().left >= lbl.right-1);
+  });
+});
 
 try{
   /* ---- boot + creation ------------------------------------------------ */
@@ -54,16 +66,55 @@ try{
   await page.evaluate(()=>{ [...document.querySelectorAll("button")].find(b=>b.textContent.includes("New Game")).click(); });
   await page.waitForTimeout(200);
   await page.fill("#dname", "Smoke");
+
+  /* ---- stabilization: appearance grouping + same-screen scroll/focus --- */
+  ok(await appearanceGrouped(), "appearance categories keep their chips as one group");
+  await noHScroll("create"); await shot("m31a-create");
+  await page.evaluate(()=>document.querySelector(".approw:last-of-type").scrollIntoView({block:"center"}));
+  await page.waitForTimeout(80);
+  const yChip = await scrollY();
+  await tap('.approw:last-of-type .chip');
+  ok(yChip>0 && Math.abs(await scrollY()-yChip)<=2, "same-screen chip tap preserves scroll ("+yChip+")");
+  ok(await page.evaluate(()=>{ const a=document.activeElement;
+     return !!(a && a.classList && a.classList.contains("chip")); }),
+     "chip tap restores focus to the activated control");
+
   await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="1"]');
+  ok(await page.evaluate(()=>{ const a=document.activeElement;
+     return !!(a && a.dataset && a.dataset.act==="skillMod" && a.dataset.skill==="gunnery"); }),
+     "skill +/- restores focus after rerender");
   await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="1"]');
   await tap('[data-act="skillMod"][data-skill="driving"][data-delta="1"]');
   await tap('[data-act="createDone"]');
   let s = await state();
   ok(s.player.created && s.scrap===100, "driver created with severance");
+  ok(await scrollY()===0, "navigation to a new screen starts at the top");
+
+  /* ---- stabilization: yard chassis cards + locked presentation --------- */
+  await tap('button.small[data-act="go"][data-to="garage"]');
+  ok(await page.evaluate(()=>{
+    const cards=[...document.querySelectorAll(".chassiscard")];
+    return cards.length===3 && cards.every(c=>
+      c.querySelectorAll(".chassisart img").length===1 &&
+      c.querySelectorAll('button[data-act="buyChassis"]').length===1);
+  }), "each chassis image pairs with exactly one stat card");
+  ok(await page.evaluate(()=>{
+    const locked=[...document.querySelectorAll(".chassiscard.locked")];
+    return locked.length>=1 && locked.every(c=>{
+      const b=c.querySelector("button");
+      return b.disabled && b.textContent.includes("more scrap needed");
+    });
+  }), "unaffordable chassis read as locked and state the missing scrap");
+  await noHScroll("yard"); await shot("m31a-yard");
+  await expectExit("yard");
+  await tap("button.exit");
+  s = await state();
+  ok(s.screen==="hub", "Leave for Main Street returns to the hub");
 
   /* ---- job board: persisted offers + emergency labor ------------------ */
   await tap('[data-act="go"][data-to="jobs"]');
   await noHScroll("jobs"); await shot("m31a-jobs");
+  await expectExit("job board");
   s = await state();
   ok(s.jobs.offers.length===3 && s.jobs.offersDay===s.world.day, "three daily offers persisted");
   const offerIds = s.jobs.offers.join(",");
@@ -81,6 +132,7 @@ try{
   await tap('[data-act^="acceptContract"]');
   ok(await has('[data-act="approach"]'), "contract screen shows approaches");
   await noHScroll("contract"); await shot("m31a-contract");
+  await expectExit("contract detail");
   await page.click('[data-act="approach"]:not([disabled])');
   await page.waitForTimeout(250);
   s = await state();
@@ -113,6 +165,7 @@ try{
   /* ---- rumors at the Slag Bar ---------------------------------------- */
   await tap('[data-act="go"][data-to="hub"]');
   await tap('[data-act="go"][data-to="bar"]');
+  await expectExit("slag bar");
   for(let i=0;i<4;i++) if(await page.$('[data-act="rumor"]:not([disabled])')) await tap('[data-act="rumor"]');
   s = await state();
   ok(s.rumors.length>=3, "structured rumors learned and recorded ("+s.rumors.length+")");
@@ -124,6 +177,7 @@ try{
   const journalText = await page.evaluate(()=>document.body.innerText);
   ok(/rumors/i.test(journalText) && /slag bar/i.test(journalText), "journal shows Rumors section");
   await noHScroll("journal");
+  await expectExit("journal");
 
   /* ---- knowledge quiz with REMEMBER ----------------------------------- */
   await tap('[data-act="go"][data-to="hub"]');
@@ -132,6 +186,7 @@ try{
      || (await state()).rumors.length<4, "familiar signal shows when a rumor matches an offer");
   await tap('[data-act="startQuiz"]');
   await noHScroll("quiz"); await shot("m31a-quiz");
+  await expectExit("knowledge activity");
   const quiz = (await state());
   ok(quiz.screen==="quiz", "quiz starts");
   // q1, q2: answer correct (indices from data: 0 then 1)
@@ -166,6 +221,7 @@ try{
   s = await state();
   ok(s.jobs.reflex.run && s.jobs.reflex.run.done, "reflex task completes");
   ok(s.jobs.reflex.run.hits>=4, "attentive play catches most pests ("+s.jobs.reflex.run.hits+"/6)");
+  await expectExit("completed pest activity");
   await tap('[data-act="pestDone"]');
 
   /* ---- garage + workshop (existing flow) ------------------------------- */
@@ -178,12 +234,33 @@ try{
   s = await state();
   ok(s.vehicles[0].plant==="junker" && s.vehicles[0].weapons.length===1, "rig outfitted");
 
+  /* ---- stabilization: workshop same-screen scroll/focus + exits -------- */
+  await expectExit("workshop");
+  await page.evaluate(()=>document.querySelector('[data-act="faceWeapon"][data-i="0"]').scrollIntoView({block:"center"}));
+  await page.waitForTimeout(80);
+  const yWork = await scrollY();
+  await tap('[data-act="faceWeapon"][data-i="0"]');
+  ok(yWork>0 && Math.abs(await scrollY()-yWork)<=2, "workshop action preserves scroll ("+yWork+")");
+  ok(await page.evaluate(()=>{ const a=document.activeElement;
+     return !!(a && a.dataset && a.dataset.act==="faceWeapon"); }),
+     "workshop action restores focus to the same control");
+  for(let i=0;i<3;i++) await tap('[data-act="faceWeapon"][data-i="0"]');   // full cycle back to F
+  s = await state();
+  ok(s.vehicles[0].weapons[0].facing==="F", "facing cycle returned to Front");
+
   /* ---- Crucible with mid-fight reload (existing flow) ------------------ */
   await tap('[data-act="go"][data-to="garage"]');
+  ok(await scrollY()===0, "leaving the workshop lands at the top of the garage");
+  await expectExit("garage");
   await tap('[data-act="go"][data-to="hub"]');
+  await tap('button.small[data-act="go"][data-to="market"]');
+  await expectExit("market");
+  await tap("button.exit");
   await tap('[data-act="go"][data-to="arena"]');
+  await expectExit("crucible lobby");
   await tap('[data-act="startBout"][data-id="q"]');
   ok(await has(".track"), "fight screen renders");
+  ok(!(await has("button.exit")), "no Main Street exit mid-fight");
   guard=0;
   let reloadedMidFight = false;
   while(guard++<120 && !(await has('[data-act="fightDone"]'))){
@@ -216,6 +293,32 @@ try{
   ok(s.scrap===finalScrap && s.player.name==="Smoke" && s.rumors.length>=3
      && Object.keys(s.jobs.resolutions).length>=1, "full state survives reload");
   await noHScroll("final");
+
+  /* ---- viewport sweep: 375x667 portrait + desktop ----------------------- */
+  for(const [w,h,label] of [[375,667,"375x667"],[1280,800,"desktop"]]){
+    const ctx = await browser.newContext({viewport:{width:w,height:h}});
+    const p2 = await ctx.newPage();
+    p2.on("pageerror", e=>consoleErrors.push(String(e)));
+    await p2.goto("http://localhost:8952/");
+    await p2.waitForTimeout(500);
+    await p2.evaluate(()=>{ [...document.querySelectorAll("button")].find(b=>b.textContent.includes("New Game")).click(); });
+    await p2.waitForTimeout(250);
+    ok(await appearanceGrouped(p2), "appearance groups hold at "+label);
+    ok(await p2.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1), "no horizontal scroll on create at "+label);
+    if(shots) await p2.screenshot({path:join(shots,"m31a-create-"+label+".png"), fullPage:true});
+    await p2.fill("#dname", "Vp");
+    await p2.click('[data-act="createDone"]'); await p2.waitForTimeout(200);
+    await p2.click('button.small[data-act="go"][data-to="garage"]'); await p2.waitForTimeout(200);
+    ok(await p2.evaluate(()=>{
+      const cards=[...document.querySelectorAll(".chassiscard")];
+      return cards.length===3 && cards.every(c=>
+        c.querySelectorAll(".chassisart img").length===1 &&
+        c.querySelectorAll('button[data-act="buyChassis"]').length===1);
+    }), "chassis pairing holds at "+label);
+    ok(await p2.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1), "no horizontal scroll on yard at "+label);
+    if(shots) await p2.screenshot({path:join(shots,"m31a-yard-"+label+".png"), fullPage:true});
+    await ctx.close();
+  }
 
   const realErrors = consoleErrors.filter(e=>!e.includes("404"));
   ok(realErrors.length===0, "no console errors ("+(realErrors.join(" | ")||"clean")+")");

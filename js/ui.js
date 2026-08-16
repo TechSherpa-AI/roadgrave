@@ -19,12 +19,38 @@ bus.on("screen", setScreen);
 export function el(html){ const d=document.createElement("div"); d.innerHTML=html; return d.firstElementChild; }
 export function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+/* Same-screen rerenders keep the viewport and refocus the activated control
+   (matched by its data-* attributes / id — stable across innerHTML rebuilds);
+   real navigation starts at the top. */
+let lastRendered = null;
+function focusKeyOf(elm){
+  if(!elm || elm===document.body || elm===document.documentElement) return null;
+  if(elm.id) return "#"+CSS.escape(elm.id);
+  const ds = elm.dataset;
+  if(!ds || !ds.act) return null;
+  return Object.keys(ds).map(k=>
+    `[data-${k.replace(/[A-Z]/g,c=>"-"+c.toLowerCase())}="${CSS.escape(ds[k])}"]`).join("");
+}
 export function render(){
   const app = document.getElementById("app");
+  const name = G ? G.screen : "title";
+  const same = name === lastRendered;
+  const y = same ? window.scrollY : 0;
+  const focusSel = same ? focusKeyOf(document.activeElement) : null;
   app.innerHTML = "";
-  const screen = SCREENS[G ? G.screen : "title"] || SCREENS.title;
+  const screen = SCREENS[name] || SCREENS.title;
   try{ screen(app); }catch(e){ console.error("screen render failed:", G.screen, e); app.appendChild(el(`<main><p class="warn">Screen error — see console.</p><button data-act="go" data-to="title">Title</button></main>`)); }
-  window.scrollTo(0,0);
+  if(name !== (G ? G.screen : "title")) return;   // screen() redirected; the inner render owns the viewport
+  lastRendered = name;
+  if(same){
+    window.scrollTo(0, y);
+    if(focusSel){
+      const t = app.querySelector(focusSel);
+      if(t && !t.disabled) t.focus({preventScroll:true});
+    }
+  } else {
+    window.scrollTo(0,0);
+  }
 }
 function headerBar(){
   const city = byId(DATA.cities, G.world.location);
@@ -35,9 +61,21 @@ function headerBar(){
 }
 function hero(name){ return `<img class="hero" src="img/${name}.jpg" alt="" onerror="this.remove()">`; }
 function backBtn(to){ return `<button class="small" data-act="go" data-to="${to||"hub"}">Back</button>`; }
+/* the one shared "leave this menu" action — safe town screens only */
+function exitBtn(){ return `<button class="small exit" data-act="go" data-to="hub">Leave for Main Street</button>`; }
+/* Chassis JPEGs have a stat panel baked into the top ~28% of the pixels; the
+   live HTML card is the source of truth, so crop the baked panel out with a
+   shared container treatment (object-position bottom + shortened aspect). */
+const CHASSIS_IMG_H = { courser:540 };            // natural heights; default 625
+const CHASSIS_CROP = 0.28;
+function chassisImg(chassisId, armored){
+  const h = CHASSIS_IMG_H[chassisId] || 625;
+  return `<div class="chassisart" style="aspect-ratio:960/${Math.round(h*(1-CHASSIS_CROP))}">
+    <img src="img/chassis-${chassisId}${armored?"-armored":""}.jpg" alt=""
+      onerror="this.closest('.chassisart').remove()"></div>`;
+}
 function chassisArt(v){
-  const armored = V.armorPts(v)>=8;
-  return hero(`chassis-${v.chassis}${armored?"-armored":""}`);
+  return chassisImg(v.chassis, V.armorPts(v)>=8);
 }
 export function devMode(){ return LS.getItem("roadgrave.dev")==="1"; }
 
@@ -241,9 +279,9 @@ export const SCREENS = {
         <button class="mini" data-act="skillMod" data-skill="${s.id}" data-delta="1" ${left<=0||draft.skills[s.id]>=SKILL_MAX?"disabled":""}>+</button>
       </div>`).join("");
     const appRows = DATA.appearance.map(cat=>`
-      <div class="approw"><span class="applbl">${cat.name}</span>
+      <div class="approw"><span class="applbl">${cat.name}</span><span class="appopts">
         ${cat.opts.map(o=>`<button class="chip ${draft.appearance[cat.id]===o.id?"sel":""}" data-act="appSet" data-cat="${cat.id}" data-opt="${o.id}">${o.name}</button>`).join("")}
-      </div>`).join("");
+      </span></div>`).join("");
     const m = el(`<main>
       <h2>New Driver</h2>
       <p class="flavor">The refinery let you go with a handshake and a severance. The road doesn't care what your papers said.</p>
@@ -299,19 +337,23 @@ export const SCREENS = {
     app.appendChild(headerBar());
     const v = V.vehicle();
     if(!v){
-      const rows = DATA.chassis.map(ch=>`
-        ${hero("chassis-"+ch.id)}
-        <button data-act="buyChassis" data-id="${ch.id}" ${G.scrap<ch.cost?"disabled":""}>
+      const rows = DATA.chassis.map(ch=>{
+        const short = ch.cost - G.scrap;
+        return `<div class="chassiscard${short>0?" locked":""}">
+        ${chassisImg(ch.id)}
+        <button data-act="buyChassis" data-id="${ch.id}" ${short>0?"disabled":""}>
           ${ch.name} — ${ch.cost} scrap
+          ${short>0?`<span class="sub locknote">Locked — ${short} more scrap needed</span>`:""}
           <span class="sub">${ch.blurb}</span>
           <span class="sub">Frame ${ch.wt} wt · carries ${ch.maxGross} · ${ch.space} space · ${ch.mounts} mounts · handling ${ch.handling>=0?"+":""}${ch.handling} · hull ${ch.hull}</span>
-        </button>`).join("");
+        </button></div>`;
+      }).join("");
       app.appendChild(el(`<main>
         ${hero("garage")}
         <h2>The Yard — pick a chassis</h2>
         <p class="flavor">Rows of frames under tarps. The yard boss quotes prices without looking up.</p>
         ${rows}
-        ${backBtn()}
+        ${exitBtn()}
       </main>`));
       return;
     }
@@ -361,7 +403,7 @@ export const SCREENS = {
       </div>
       <button class="primary" data-act="go" data-to="workshop">Open the Workshop</button>
       <button class="danger small" data-act="sellVehicle">Sell rig — ${V.sellVal(V.vInvested(v))} scrap</button>
-      ${backBtn()}
+      ${exitBtn()}
     </main>`));
   },
 
@@ -447,6 +489,7 @@ export const SCREENS = {
       ${gearRows}
       ${buyGearRows}
       <button class="primary" data-act="go" data-to="garage">Done — back to the Garage</button>
+      ${exitBtn()}
     </main>`));
   },
 
@@ -475,7 +518,7 @@ export const SCREENS = {
       <button data-act="buyRes" data-kind="food" ${G.scrap<pd.cost?"disabled":""}>Buy food — ${pd.cost} scrap<span class="sub">+${pd.qty} rations. Matters when you have a crew (Slice 4).</span></button>
       ${v && v.weapons.length ? `<h2>Ammo</h2>${ammoRows}` : ""}
       <p class="dim">Parts and weapons are fitted at the Workshop. Faction prices arrive with reputation.</p>
-      ${backBtn()}
+      ${exitBtn()}
     </main>`));
   },
 
@@ -551,7 +594,7 @@ export const SCREENS = {
         <span class="sub">${W.EMERGENCY_LABOR.flavor}</span>
         <span class="sub">20–30 scrap · Mechanics helps · always here · takes the day</span>
       </button>
-      ${backBtn()}
+      ${exitBtn()}
     </main>`));
   },
 
@@ -590,6 +633,7 @@ export const SCREENS = {
       ${approaches}
       <button class="danger small" data-act="abandonContract">Abandon the contract</button>
       ${backBtn("jobs")}
+      ${exitBtn()}
     </main>`));
   },
 
@@ -610,6 +654,7 @@ export const SCREENS = {
         : `<button class="small" data-act="remember" data-id="${q.rumorHint}">REMEMBER<span class="sub">Something you heard might apply here.</span></button>`) : ""}
       ${q.options.map((o,i)=>`<button data-act="answerQuiz" data-cid="${cid}" data-i="${i}">${esc(o)}</button>`).join("")}
       <p class="dim">${st.correct} right so far · 10 scrap each, +10 for a sweep</p>
+      ${exitBtn()}
     </main>`));
   },
 
@@ -626,6 +671,7 @@ export const SCREENS = {
           <p class="flavor">${run.hits>=c.reflex.targets?"Finch inspects the cage like a general inspecting a battlefield, and pays without haggling.":"The survivors will tell stories about you. Finch pays for the ones that won't."}</p>
         </div>
         <button class="primary" data-act="pestDone">Collect and go</button>
+        ${exitBtn()}
       </main>`));
       return;
     }
@@ -649,7 +695,7 @@ export const SCREENS = {
       <button data-act="rumor" ${G.scrap<5?"disabled":""}>Buy a round — 5 scrap<span class="sub">Loosen a tongue, hear the road</span></button>
       <div class="panel">${(G.log.filter(l=>l.startsWith("Slag Bar:")).slice(-4).map(t=>`<p class="dim">${esc(t.slice(10))}</p>`).join("")) || '<p class="dim">Nobody’s talking yet.</p>'}</div>
       <div class="panel"><p class="dim">Drivers, gunners, and mechanics drink here. Recruiting opens in Slice 4.</p></div>
-      ${backBtn()}
+      ${exitBtn()}
     </main>`));
   },
 
@@ -680,7 +726,7 @@ export const SCREENS = {
       ${(G.history.defeatedBruna)?'<p class="flavor">Your name is burned into the gate in torch-script, right under three seasons of Bruna\'s. Kids point when you walk past.</p>':""}
       <div class="panel"><p>${readyLine}</p></div>
       ${rows}
-      ${backBtn()}
+      ${exitBtn()}
     </main>`));
   },
 
@@ -785,7 +831,7 @@ export const SCREENS = {
       ${rumorRows?`<h2>Rumors — what you've heard</h2>${rumorRows}`:""}
       <h2>The record</h2>
       ${entries}
-      ${backBtn()}
+      ${exitBtn()}
     </main>`));
   },
 
