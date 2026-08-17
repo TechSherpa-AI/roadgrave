@@ -45,8 +45,24 @@ export function render(){
   if(same){
     window.scrollTo(0, y);
     if(focusSel){
-      const t = app.querySelector(focusSel);
-      if(t && !t.disabled) t.focus({preventScroll:true});
+      /* if the activated control disabled itself (e.g. a +/- hit its cap),
+         fall back: enabled sibling in the same row/group -> nearest enabled
+         non-danger control in the same section -> the section itself.
+         Never a .danger control, never <body>. */
+      const usable = c => !!c && !c.disabled && !c.classList.contains("danger");
+      let t = app.querySelector(focusSel);
+      if(!t || t.disabled){
+        const anchor = t;
+        const group = anchor && (anchor.closest(".row, .appopts, .btnrow, .grid2") || anchor.parentElement);
+        const section = anchor && anchor.closest(".panel, main");
+        t = (group && [...group.querySelectorAll("[data-act], button")].find(usable))
+         || (section && [...section.querySelectorAll("[data-act], button")].find(usable))
+         || section || app.querySelector("main");
+      }
+      if(t){
+        if(!/^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test(t.tagName)) t.tabIndex = -1;
+        t.focus({preventScroll:true});
+      }
     }
   } else {
     window.scrollTo(0,0);
@@ -888,7 +904,8 @@ export const SCREENS = {
         <button id="doReset" class="danger small">Erase save and restart</button>
       </div>
       ${devMode()?`<h2>Developer</h2><div class="panel"><button class="small" data-act="go" data-to="debug">Open debug panel</button></div>`:""}
-      <button class="primary" data-act="go" data-to="${G.campaign.flags.started && G.player.created ? "hub" : "title"}">Back</button>
+      ${G.campaign.flags.started && G.player.created ? exitBtn()
+        : `<button class="primary" data-act="go" data-to="title">Back</button>`}
     </main>`);
     const msg = (t,ok)=>{ const e=m.querySelector("#msg"); e.textContent=t; e.className="msg "+(ok?"ok":"err"); };
     m.querySelector("#ironman").onchange = e=>{ G.meta.ironman = e.target.checked; save(); };

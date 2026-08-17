@@ -63,6 +63,15 @@ try{
   await page.goto("http://localhost:8952/");
   await page.waitForTimeout(600);
   ok(await page.evaluate(()=>document.body.innerText.includes("ROADGRAVE")), "title renders");
+
+  /* ---- settings before a career: contextual Back, no Main Street exit --- */
+  await tap('[data-act="go"][data-to="settings"]');
+  ok(await page.evaluate(()=>{
+    const b=document.querySelector('button[data-act="go"][data-to="title"]');
+    return !!b && b.textContent.includes("Back") && !document.querySelector("button.exit");
+  }), "settings before creation shows Back (to title), no Main Street exit");
+  await tap('button[data-act="go"][data-to="title"]');
+
   await page.evaluate(()=>{ [...document.querySelectorAll("button")].find(b=>b.textContent.includes("New Game")).click(); });
   await page.waitForTimeout(200);
   await page.fill("#dname", "Smoke");
@@ -85,6 +94,20 @@ try{
      "skill +/- restores focus after rerender");
   await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="1"]');
   await tap('[data-act="skillMod"][data-skill="driving"][data-delta="1"]');
+
+  /* ---- boundary: the tap that disables its own control ------------------ */
+  await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="1"]');  // -> 3
+  const yCap = await scrollY();
+  await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="1"]');  // -> 4, "+" disables
+  ok(Math.abs(await scrollY()-yCap)<=2, "cap-hitting tap preserves scroll");
+  ok(await page.evaluate(()=>{
+    const a=document.activeElement;
+    return !!(a && a!==document.body && !a.disabled && !a.classList.contains("danger")
+      && a.dataset && a.dataset.act==="skillMod" && a.dataset.skill==="gunnery");
+  }), "focus falls back to an enabled non-danger control in the same group");
+  await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="-1"]'); // -> 3
+  await tap('[data-act="skillMod"][data-skill="gunnery"][data-delta="-1"]'); // -> 2 (original flow)
+
   await tap('[data-act="createDone"]');
   let s = await state();
   ok(s.player.created && s.scrap===100, "driver created with severance");
@@ -110,6 +133,16 @@ try{
   await tap("button.exit");
   s = await state();
   ok(s.screen==="hub", "Leave for Main Street returns to the hub");
+
+  /* ---- settings during an active career: shared Main Street exit ------- */
+  await tap('button.small[data-act="go"][data-to="settings"]');
+  ok(await page.evaluate(()=>{
+    const b=document.querySelector('button.exit[data-act="go"][data-to="hub"]');
+    return !!b && b.textContent.includes("Leave for Main Street");
+  }), "settings with an active career uses the shared Main Street exit");
+  await tap("button.exit");
+  s = await state();
+  ok(s.screen==="hub", "settings exit returns to the hub");
 
   /* ---- job board: persisted offers + emergency labor ------------------ */
   await tap('[data-act="go"][data-to="jobs"]');
