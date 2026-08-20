@@ -13,6 +13,7 @@ import { createServer } from "node:http";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
+import { bearing, canFire } from "../js/combat.js";   // pure helpers for the fight driver
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const shots = process.env.SMOKE_SHOTS || "";
@@ -296,6 +297,7 @@ try{
   ok(!(await has("button.exit")), "no Main Street exit mid-fight");
   guard=0;
   let reloadedMidFight = false;
+  let prevGapSig = null;      // last round's relative geometry, for standoff detection
   while(guard++<120 && !(await has('[data-act="fightDone"]'))){
     if(guard===1){                       // mid-fight persistence, in anger
       await page.waitForTimeout(400);
@@ -304,7 +306,24 @@ try{
       ok(await has(".track"), "mid-fight reload restores the fight");
     }
     if(await has('[data-act="maneuver"][data-m="coast"]')){
-      if(await page.$('[data-act="maneuver"][data-m="accel"]:not([disabled])'))
+      /* standoff escape: when the gap is frozen — same bearing/distance as
+         last round at matched speed — and no live loaded weapon can fire
+         (out of range/arc, or dry), brake to change relative position.
+         Otherwise chase: accelerate while able, else coast. */
+      s = await state();
+      const c = s.combat, pv = s.vehicles[s.activeVehicle||0];
+      let brake = false;
+      if(c && pv){
+        const brg = bearing(c.p, c.e);
+        const live = pv.weapons.filter(w=>!w.dmgd && w.ammo>0);
+        const noShot = !live.some(w=>canFire({st:c.p}, w, brg).ok);
+        const sig = brg.arc+brg.dist+":"+c.p.speed+":"+c.e.speed;
+        brake = noShot && c.p.speed===c.e.speed && c.p.speed>0 && sig===prevGapSig;
+        prevGapSig = sig;
+      }
+      if(brake && await page.$('[data-act="maneuver"][data-m="brake"]:not([disabled])'))
+        await tap('[data-act="maneuver"][data-m="brake"]');
+      else if(await page.$('[data-act="maneuver"][data-m="accel"]:not([disabled])'))
         await tap('[data-act="maneuver"][data-m="accel"]');
       else await tap('[data-act="maneuver"][data-m="coast"]');
     }
@@ -313,7 +332,21 @@ try{
       await page.click('[data-act="fire"]:not([disabled])').then(()=>page.waitForTimeout(100));
     if(await page.$('[data-act="endTurn"]')) await tap('[data-act="endTurn"]');
   }
-  ok(guard<120 && reloadedMidFight, "bout completes through the UI after mid-fight reload");
+  let stallDiag = "";
+  if(guard>=120 && !(await has('[data-act="fightDone"]'))){
+    s = await state();
+    const c = s.combat || {};
+    const pv = (s.vehicles||[])[s.activeVehicle||0] || {weapons:[]};
+    const brg = c.p && c.e ? bearing(c.p, c.e) : {arc:"?", dist:"?"};
+    const ammo = ws => (ws||[]).map(w=>w.id+(w.dmgd?"(dmgd)":"")+":"+w.ammo).join(" ");
+    stallDiag = ` — STALL seed=${s.meta&&s.meta.seed} round=${c.round} phase=${c.phase}`
+      + ` p={pos:${c.p&&c.p.pos},lane:${c.p&&c.p.lane},speed:${c.p&&c.p.speed}}`
+      + ` e={pos:${c.e&&c.e.pos},lane:${c.e&&c.e.lane},speed:${c.e&&c.e.speed}}`
+      + ` bearing=${brg.arc}${brg.dist}`
+      + ` dmg p=${JSON.stringify(pv.dmg)} e=${JSON.stringify(c.foeV&&c.foeV.dmg)}`
+      + ` ammo p=[${ammo(pv.weapons)}] e=[${ammo(c.foeV&&c.foeV.weapons)}]`;
+  }
+  ok(guard<120 && reloadedMidFight, "bout completes through the UI after mid-fight reload"+stallDiag);
   await tap('[data-act="fightDone"]');
   s = await state();
   ok(s.career.crucibleWins + s.career.crucibleLosses === 1, "career records the bout");

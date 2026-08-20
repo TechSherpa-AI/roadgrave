@@ -233,6 +233,59 @@ section("crucible");
   }
 }
 
+/* ================= CRUCIBLE STANDOFF =================================== */
+section("crucible standoff (equal-speed no-shot lock)");
+{
+  // Mirror of the browser smoke rig: rookie skiff vs Odo's skiff, both with
+  // front-facing Close-range scatterguns and matched maxSpeed. Seed 325 locks
+  // into an equal-speed out-of-range orbit if the driver never deliberately
+  // changes speed — the qualifier can then run past any turn guard.
+  const smokeRig = seed => {
+    const g = newGame(); g.meta.seed = seed;
+    g.campaign.flags.started = true;
+    g.player.created = true; g.player.name = "Smoke";
+    g.player.skills = {driving:0,gunnery:1,mechanics:0,scrounge:0};
+    setG(g); seedRng(seed);
+    G.scrap = 300;
+    V.buyChassis("skiff"); V.setPlant("junker"); V.buyWeapon("scatter");
+  };
+  const noShot = () => {
+    const c = G.combat;
+    const brg = C.bearing(c.p, c.e);
+    const live = V.vehicle().weapons.filter(w=>!w.dmgd && w.ammo>0);
+    return !live.some(w=>C.canFire({st:c.p}, w, brg).ok);
+  };
+  const driveQualifier = (seed, breakStandoffs) => {
+    smokeRig(seed);
+    C.startBout("q");
+    let turns=0, prev=null;
+    while(G.combat && !G.combat.done && turns++<120){
+      const c = G.combat;
+      if(c.phase==="move"){
+        const brg = C.bearing(c.p, c.e);
+        const sig = brg.arc+brg.dist+":"+c.p.speed+":"+c.e.speed;
+        const frozen = breakStandoffs && noShot()
+          && c.p.speed===c.e.speed && c.p.speed>0 && sig===prev;
+        prev = sig;
+        C.playerManeuver(frozen ? "brake" : (brg.dist>3 ? "accel" : "coast"));
+      }
+      for(let i=0;i<V.vehicle().weapons.length;i++){ if(G.combat.done) break; C.playerFire(i); }
+      if(!G.combat.done) C.endTurn();
+    }
+    return turns;
+  };
+  // without a deliberate speed change the bout never resolves…
+  driveQualifier(325, false);
+  ok(G.combat && !G.combat.done, "seed 325: speed-matched driver locks into a standoff");
+  ok(G.combat && G.combat.p.speed===G.combat.e.speed && noShot(),
+     "the lock is a genuine equal-speed no-shot orbit");
+  // …braking out of the frozen gap resolves the same seed within the guard
+  const turns = driveQualifier(325, true);
+  ok(G.combat && G.combat.done && ["win","lose"].includes(G.combat.result),
+     "seed 325: braking out of the standoff resolves the bout ("+(G.combat&&G.combat.result)+")");
+  ok(turns<120, "resolution bounded ("+turns+" of 120 turns)");
+}
+
 /* ================= NARRATIVE =========================================== */
 section("narrative");
 {
