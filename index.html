@@ -46,7 +46,7 @@
 <head>
 <meta charset="utf-8">
 <title>ROADGRAVE</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -60,6 +60,9 @@
     --red:#e06055; --blue:#6fa8dc;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  /* controls swallow double-tap-to-zoom (rapid taps must not zoom/pan the
+     viewport) while page-level pinch-zoom stays available */
+  button, input, textarea, select, label.toggle{touch-action:manipulation;}
   html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
     font:17px/1.45 -apple-system,"SF Mono",Menlo,system-ui,sans-serif;
     height:100%; overscroll-behavior:none;}

@@ -21,7 +21,11 @@ export function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt
 
 /* Same-screen rerenders keep the viewport and refocus the activated control
    (matched by its data-* attributes / id — stable across innerHTML rebuilds);
-   real navigation starts at the top. */
+   real navigation starts at the top.
+   Touch devices skip the refocus: taps don't need a keyboard focus ring, and
+   programmatic focus after a tap-driven rerender nudges iOS Safari's visual
+   viewport (zoom/pan creep under rapid taps). Fine pointers keep it. */
+const COARSE_POINTER = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
 let lastRendered = null;
 function focusKeyOf(elm){
   if(!elm || elm===document.body || elm===document.documentElement) return null;
@@ -36,7 +40,7 @@ export function render(){
   const name = G ? G.screen : "title";
   const same = name === lastRendered;
   const y = same ? window.scrollY : 0;
-  const focusSel = same ? focusKeyOf(document.activeElement) : null;
+  const focusSel = same && !COARSE_POINTER ? focusKeyOf(document.activeElement) : null;
   app.innerHTML = "";
   const screen = SCREENS[name] || SCREENS.title;
   try{ screen(app); }catch(e){ console.error("screen render failed:", G.screen, e); app.appendChild(el(`<main><p class="warn">Screen error — see console.</p><button data-act="go" data-to="title">Title</button></main>`)); }

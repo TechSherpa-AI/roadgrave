@@ -386,6 +386,72 @@ try{
     await ctx.close();
   }
 
+  /* ---- touch context: rapid taps must not zoom/pan the viewport ---------
+     Real touch input (locator.tap) on an iPhone-shaped, touch-capable,
+     mobile-emulated context. Chromium cannot fully reproduce iOS Safari's
+     double-tap visual-viewport zoom, so this asserts the mechanisms:
+     touch-action:manipulation on controls, no programmatic focus restoration
+     on touch, and a stable layout/visual viewport under rapid tapping. */
+  {
+    const ctx = await browser.newContext({viewport:{width:375,height:667}, hasTouch:true, isMobile:true});
+    await ctx.addInitScript(()=>{
+      window.__rgFocusCalls = 0;
+      const orig = HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus = function(...a){ window.__rgFocusCalls++; return orig.apply(this,a); };
+    });
+    const tp = await ctx.newPage();
+    tp.on("pageerror", e=>consoleErrors.push(String(e)));
+    await tp.goto("http://localhost:8952/");
+    await tp.waitForTimeout(500);
+    await tp.evaluate(()=>{ [...document.querySelectorAll("button")].find(b=>b.textContent.includes("New Game")).click(); });
+    await tp.waitForTimeout(250);
+
+    ok(await tp.evaluate(()=>["[data-act=\"skillMod\"]", "button.chip", "[data-act=\"createDone\"]", "#dname"]
+        .every(sel=>getComputedStyle(document.querySelector(sel)).touchAction==="manipulation")),
+       "controls carry touch-action:manipulation");
+
+    const viewportStable = async label => {
+      const v = await tp.evaluate(()=>({
+        sx: window.scrollX,
+        docW: document.documentElement.scrollWidth, winW: window.innerWidth,
+        vvLeft: window.visualViewport ? window.visualViewport.offsetLeft : 0,
+        vvScale: window.visualViewport ? window.visualViewport.scale : 1,
+        focusCalls: window.__rgFocusCalls,
+      }));
+      ok(v.sx===0, label+": scrollX stays 0");
+      ok(v.docW<=v.winW+1, label+": no horizontal growth ("+v.docW+" vs "+v.winW+")");
+      ok(v.vvLeft===0, label+": visual viewport not panned ("+v.vvLeft+")");
+      ok(v.vvScale===1, label+": visual viewport not zoomed ("+v.vvScale+")");
+      ok(v.focusCalls===0, label+": no programmatic focus on touch ("+v.focusCalls+" calls)");
+    };
+
+    // rapid character-creation +/- taps
+    await tp.evaluate(()=>{ window.__rgFocusCalls = 0; });
+    for(const [skill,delta] of [["gunnery","1"],["gunnery","1"],["driving","1"],["gunnery","-1"]])
+      await tp.locator(`[data-act="skillMod"][data-skill="${skill}"][data-delta="${delta}"]`).tap();
+    await viewportStable("rapid skill taps");
+
+    await tp.fill("#dname", "Tap");
+    await tp.locator('[data-act="createDone"]').tap();
+    await tp.waitForTimeout(250);
+    // bankroll the rig deterministically (severance alone can't fit a full rig)
+    await tp.evaluate(()=>{ const g=JSON.parse(localStorage.getItem("roadgrave.save"));
+      g.scrap=400; localStorage.setItem("roadgrave.save", JSON.stringify(g)); });
+    await tp.reload(); await tp.waitForTimeout(500);
+    await tp.locator('button.small[data-act="go"][data-to="garage"]').tap();
+    await tp.locator('[data-act="buyChassis"][data-id="skiff"]').tap();
+    // rapid workshop interactions: fit plant + weapon, then two full facing cycles
+    await tp.evaluate(()=>{ window.__rgFocusCalls = 0; });
+    await tp.locator('[data-act="setPlant"][data-id="junker"]').tap();
+    await tp.locator('[data-act="buyWeapon"][data-id="scatter"]').tap();
+    for(let i=0;i<8;i++) await tp.locator('[data-act="faceWeapon"][data-i="0"]').tap();
+    await viewportStable("rapid workshop taps");
+    const ts = await tp.evaluate(()=>window.__RG_STATE());
+    ok(ts.vehicles[0].plant==="junker" && ts.vehicles[0].weapons[0].facing==="F",
+       "touch taps performed real actions (rig fitted, facing cycled to Front)");
+    await ctx.close();
+  }
+
   const realErrors = consoleErrors.filter(e=>!e.includes("404"));
   ok(realErrors.length===0, "no console errors ("+(realErrors.join(" | ")||"clean")+")");
 }catch(e){
